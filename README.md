@@ -1,2 +1,3 @@
 # `diff-fuse`
-Utility for combining unified diffs
+
+Utility for merging diffs from `svn diff`.
