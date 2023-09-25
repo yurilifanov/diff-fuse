@@ -1,0 +1,6 @@
+Index: test.txt
+===================================================================
+--- test.txt    (nonexistent)
++++ test.txt    (working copy)
+@@ -0,0 +1 @@
++a
