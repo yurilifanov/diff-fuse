@@ -12,6 +12,6 @@ mod parse {
             assert_eq!(data, diff.to_string());
         }
 
-        casegen::for_each_file!("./svn/test-data/", test_impl);
+        casegen::for_each_file!("tests/data/svn/parse/success/", test_impl);
     }
 }

@@ -40,6 +40,7 @@ pub fn for_each_file(_item: TokenStream) -> TokenStream {
     println!("callable = {}", callable);
 
     let source_dir = manifest_dir().join(unquote(&path_suffix));
+    println!("Test data: source_dir = {}", source_dir.display());
     if !source_dir.is_dir() {
         panic!("{} is not a directory!", source_dir.display());
     }
