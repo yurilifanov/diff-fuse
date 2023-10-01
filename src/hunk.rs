@@ -1,10 +1,9 @@
 use crate::error::ParseError;
 use crate::macros::parse_err;
-use std::ops::Deref;
 
 #[derive(Debug)]
-pub struct Hunk<'a> {
-    _lines: Vec<&'a str>,
+pub struct Hunk {
+    _lines: Vec<String>,
     _header: [usize; 4],
 }
 
@@ -16,7 +15,7 @@ fn parse_usize(string: &&str) -> Result<usize, ParseError> {
     string
         .parse::<i64>()
         .map(|val| val.wrapping_abs() as usize)
-        .map_err(|_| parse_err!("Hunk: Could not parse i64 from {}", string))
+        .map_err(|_| parse_err!("Hunk header: Could not parse i64 from {}", string))
 }
 
 fn parse_n<const N: usize>(values: &Vec<&str>) -> Result<[usize; N], ParseError> {
@@ -43,13 +42,13 @@ fn parse(values: Vec<&str>) -> Result<[usize; 4], ParseError> {
         }
         4 => parse_n::<4>(&values),
         _ => Err(parse_err!(
-            "Hunk header: Unexpected number of integers - {:?}",
+            "Hunk header: Unexpected number of fields - {:?}",
             values
         )),
     }
 }
 
-impl Hunk<'_> {
+impl Hunk {
     fn parse_header(line: &&str) -> Result<[usize; 4], ParseError> {
         let fields = line
             .strip_prefix("@@ ")
@@ -60,28 +59,25 @@ impl Hunk<'_> {
         parse(fields)
     }
 
-    pub fn parse<'a>(lines: &'a [&'a str]) -> Result<Hunk<'a>, ParseError> {
+    pub fn parse(lines: &[&str]) -> Result<Hunk, ParseError> {
         let first = lines
             .get(0)
             .ok_or(parse_err!("Hunk: Could not fetch first line"))?;
 
-        let header: [usize; 4] = Hunk::parse_header(&first)?;
+        let _header: [usize; 4] = Hunk::parse_header(&first)?;
 
-        let mut _lines: Vec<&str> = vec![first];
+        let mut _lines: Vec<String> = vec![first.to_string()];
         for line in lines.iter().skip(1) {
             if !line.starts_with(['+', '-', ' ']) {
                 break;
             }
-            _lines.push(line);
+            _lines.push(line.to_string());
         }
 
-        Ok(Hunk {
-            _lines: _lines,
-            _header: header,
-        })
+        Ok(Hunk { _lines, _header })
     }
 
-    pub fn lines(&self) -> &[&str] {
-        &self._lines[..]
+    pub fn lines(&self) -> &Vec<String> {
+        &self._lines
     }
 }

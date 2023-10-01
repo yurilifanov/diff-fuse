@@ -2,8 +2,8 @@ macro_rules! debugln {
     ($($args:expr),*) => (
         #[cfg(debug_assertions)]
         {
-            print!("[DEBUG] ");
-            println!($($args),*);
+            eprint!("[DEBUG] ");
+            eprintln!($($args),*);
         }
     )
 }

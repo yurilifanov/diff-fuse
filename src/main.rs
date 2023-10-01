@@ -1,3 +1,4 @@
+mod diff;
 mod error;
 mod file_diff;
 mod header;
@@ -6,32 +7,9 @@ mod input;
 mod macros;
 
 use std::fs;
-use std::iter::zip;
 
-use file_diff::FileDiff;
+use diff::Diff;
 use macros::debugln;
-
-fn get_line_separator(data: &String) -> &str {
-    if data.find("\r\n").is_none() {
-        debugln!("LF separator detected");
-        return "\n";
-    }
-
-    debugln!("CRLF separator detected");
-    let last = data.len() - 1;
-    let zipped = zip(data[..last].chars(), data[1..].chars());
-    for (prev, curr) in zipped {
-        if curr == '\n' && prev != '\r' {
-            panic!("Inconsistent line separator");
-        }
-    }
-    "\r\n"
-}
-
-fn get_lines(data: &String) -> Vec<&str> {
-    let sep = get_line_separator(data);
-    data.split_terminator(sep).collect()
-}
 
 fn main() {
     if input::has_help_arg() {
@@ -50,9 +28,13 @@ fn main() {
     let data = fs::read_to_string(path).unwrap();
     debugln!("{}", data);
 
-    let lines = get_lines(&data);
-    debugln!("{} lines read", lines.len());
+    // let lines = get_lines(&data);
+    // debugln!("{} lines read", lines.len());
 
-    let file_diff = FileDiff::parse(&lines[..]).unwrap();
-    debugln!("{:?}", file_diff);
+    let diff = Diff::from(data.parse().unwrap());
+    debugln!("{:?}", diff);
+
+    for line in diff.line_iter() {
+        println!("{}", line);
+    }
 }
