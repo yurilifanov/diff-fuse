@@ -1,4 +1,11 @@
+mod info_iter;
+mod line_iter;
+mod merge;
+
+// use std::cmp::{max, min};
+
 use crate::error::ParseError;
+use crate::hunk::info_iter::InfoIter;
 use crate::macros::parse_err;
 
 #[derive(Debug)]
@@ -15,16 +22,26 @@ fn parse_usize(string: &&str) -> Result<usize, ParseError> {
     string
         .parse::<i64>()
         .map(|val| val.wrapping_abs() as usize)
-        .map_err(|_| parse_err!("Hunk header: Could not parse i64 from {}", string))
+        .map_err(|_| {
+            parse_err!("Hunk header: Could not parse i64 from {}", string)
+        })
 }
 
-fn parse_n<const N: usize>(values: &Vec<&str>) -> Result<[usize; N], ParseError> {
+fn parse_n<const N: usize>(
+    values: &Vec<&str>,
+) -> Result<[usize; N], ParseError> {
     values
         .iter()
         .flat_map(parse_usize)
         .collect::<Vec<usize>>()
         .try_into()
-        .map_err(|_| parse_err!("Hunk header: Expected {} integers, got {:?}", N, values))
+        .map_err(|_| {
+            parse_err!(
+                "Hunk header: Expected {} integers, got {:?}",
+                N,
+                values
+            )
+        })
 }
 
 fn parse(values: Vec<&str>) -> Result<[usize; 4], ParseError> {
@@ -54,7 +71,9 @@ impl Hunk {
             .strip_prefix("@@ ")
             .map_or_else(|| None, |s| s.strip_suffix(" @@"))
             .map(split)
-            .ok_or_else(|| parse_err!("Hunk: Could not parse header from '{}'", line))?;
+            .ok_or_else(|| {
+                parse_err!("Hunk: Could not parse header from '{}'", line)
+            })?;
 
         parse(fields)
     }
@@ -80,4 +99,61 @@ impl Hunk {
     pub fn lines(&self) -> &Vec<String> {
         &self._lines
     }
+
+    // fn start_number(&self) -> usize {
+    //     min(self._header[0], self._header[2])
+    // }
+    //
+    // fn end_number(&self) -> usize {
+    //     self.start_number() + max(self._header[1], self._header[3])
+    // }
+    //
+    // fn number_range(&self) -> [usize; 2] {
+    //     [self.start_number(), self.end_number()]
+    // }
+    //
+    // pub fn overlaps(&self, other: &Hunk) -> bool {
+    //     let [this_start, this_end] = self.number_range();
+    //     let [that_start, that_end] = other.number_range();
+    //     return this_start <= that_end && this_end >= that_start;
+    // }
+
+    // fn line_iter(&self) -> LineIter {
+    //     LineIter::new(self._lines[1..].iter()) // skip header
+    // }
 }
+
+// #[cfg(test)]
+// mod test_merge {
+//     use crate::hunk::Hunk;
+//
+//     #[test]
+//     fn case_1() {
+//         let left = "\
+// @@ -1 +1 @@
+// -a
+// +b
+// "
+//         .lines()
+//         .collect::<Vec<&str>>();
+//         let right = "\
+// @@ -1 +1,2 @@
+// -b
+// +c
+// +d
+// "
+//         .lines()
+//         .collect::<Vec<&str>>();
+//         let expected = "\
+// @@ -1 +1,2 @@
+// -b
+// +c
+// +d
+// "
+//         .lines()
+//         .collect::<Vec<&str>>();
+//
+//         let first = Hunk::parse(&left[..]).unwrap();
+//         let second = Hunk::parse(&right[..]).unwrap();
+//     }
+// }

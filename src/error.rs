@@ -19,3 +19,22 @@ impl Display for ParseError {
 }
 
 impl Error for ParseError {}
+
+#[derive(Debug)]
+pub struct MergeError {
+    _msg: String,
+}
+
+impl MergeError {
+    pub fn from(msg: String) -> MergeError {
+        MergeError { _msg: msg }
+    }
+}
+
+impl Display for MergeError {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        write!(f, "MergeError: {}", self._msg)
+    }
+}
+
+impl Error for MergeError {}
