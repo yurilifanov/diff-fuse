@@ -1,6 +1,5 @@
 mod info_iter;
-mod line_iter;
-mod merge;
+mod merge_iter;
 
 // use std::cmp::{max, min};
 
