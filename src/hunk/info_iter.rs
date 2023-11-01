@@ -1,5 +1,4 @@
 use std::iter::{Enumerate, Peekable};
-use std::slice::Iter;
 
 #[derive(Debug, PartialEq)]
 pub struct Info<'a> {
@@ -8,13 +7,13 @@ pub struct Info<'a> {
     pub num: usize,
 }
 
-pub struct InfoIter<'a> {
-    after: Peekable<LineIter<'a>>,
-    before: Peekable<LineIter<'a>>,
+pub struct InfoIter<'a, T: Iterator<Item = &'a str> + Clone> {
+    after: Peekable<LineIter<'a, T>>,
+    before: Peekable<LineIter<'a, T>>,
 }
 
-impl<'a> InfoIter<'a> {
-    pub fn new(header: &[usize; 4], iter: Iter<'a, String>) -> InfoIter<'a> {
+impl<'a, T: Iterator<Item = &'a str> + Clone> InfoIter<'a, T> {
+    pub fn new(header: &[usize; 4], iter: T) -> InfoIter<'a, T> {
         InfoIter {
             after: LineIter::<'a> {
                 iter: iter.clone().enumerate(),
@@ -32,7 +31,7 @@ impl<'a> InfoIter<'a> {
     }
 }
 
-impl<'a> Iterator for InfoIter<'a> {
+impl<'a, T: Iterator<Item = &'a str> + Clone> Iterator for InfoIter<'a, T> {
     type Item = (Option<Info<'a>>, Option<Info<'a>>);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -44,25 +43,25 @@ impl<'a> Iterator for InfoIter<'a> {
                     _ => Some((self.after.next(), self.before.next())),
                 }
             }
-            (Some(a), None) => Some((self.after.next(), None)),
-            (None, Some(b)) => Some((None, self.before.next())),
+            (Some(_), None) => Some((self.after.next(), None)),
+            (None, Some(_)) => Some((None, self.before.next())),
             _ => None,
         }
     }
 }
 
-struct LineIter<'a> {
-    iter: Enumerate<Iter<'a, String>>,
+struct LineIter<'a, T: Iterator<Item = &'a str> + Clone> {
+    iter: Enumerate<T>,
     prefix: char,
     num: usize,
 }
 
-impl<'a> Iterator for LineIter<'a> {
+impl<'a, T: Iterator<Item = &'a str> + Clone> Iterator for LineIter<'a, T> {
     type Item = Info<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let (index, line): (usize, &String) = self.iter.next()?;
+            let (index, line): (usize, &str) = self.iter.next()?;
             if line.starts_with([' ', self.prefix]) {
                 let num = self.num;
                 self.num += 1;
@@ -103,7 +102,7 @@ mod tests {
             (None, info("-", 8, 6)),
         ];
 
-        let actual = InfoIter::new(&header, data.iter());
+        let actual = InfoIter::new(&header, data.iter().map(|s| s.as_str()));
         for (act, exp) in actual.zip(expected.iter()) {
             assert_eq!(act, *exp);
         }

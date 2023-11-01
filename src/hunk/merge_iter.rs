@@ -2,11 +2,10 @@ use crate::error::MergeError;
 use crate::hunk::info_iter::{Info, InfoIter};
 use crate::macros::merge_err;
 use std::iter::Peekable;
-use std::slice::Iter;
 
-struct MergeIter<'a> {
-    lhs: Peekable<InfoIter<'a>>,
-    rhs: Peekable<InfoIter<'a>>,
+struct MergeIter<'a, T: Iterator<Item = &'a str> + Clone> {
+    lhs: Peekable<InfoIter<'a, T>>,
+    rhs: Peekable<InfoIter<'a, T>>,
 }
 
 #[derive(Debug)]
@@ -61,7 +60,7 @@ impl<'a> From<(MaybeInfoPack<'a>, MaybeInfoPack<'a>)> for MergeItem<'a> {
     }
 }
 
-impl<'a> Iterator for MergeIter<'a> {
+impl<'a, T: Iterator<Item = &'a str> + Clone> Iterator for MergeIter<'a, T> {
     type Item = MergeItem<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -145,7 +144,7 @@ impl<'a> Iterator for MergeIter<'a> {
                         }
                     }
                 }
-                (Some(la), Some(lb), Some(ra), None) => {
+                (Some(_), Some(_), Some(_), None) => {
                     // lhs changed, rhs added
                     return Some(MergeItem::from(self.lhs.next()));
                 }
@@ -165,7 +164,7 @@ impl<'a> Iterator for MergeIter<'a> {
                     }
                 }
                 (Some(_), Some(lb), Some(ra), Some(_)) => {
-                    // both changed
+                    // both maybe changed
                     if lb.line.starts_with('-') && ra.line.starts_with('+') {
                         return Some(MergeItem::from((
                             self.lhs.next(),
@@ -193,41 +192,59 @@ impl<'a> Iterator for MergeIter<'a> {
 
 #[cfg(test)]
 mod tests {
-
     use crate::hunk::info_iter::InfoIter;
     use crate::hunk::merge_iter::{MergeItem, MergeIter};
 
+    struct Case<'a> {
+        lines: [Vec<&'a str>; 2],
+        headers: [[usize; 4]; 2],
+        expected: ([usize; 4], Vec<&'a str>),
+    }
+
+    impl<'a> Case<'a> {
+        fn info_iter(
+            &'a self,
+            index: usize,
+        ) -> InfoIter<'a, std::vec::IntoIter<&str>> {
+            InfoIter::new(
+                &self.headers[index],
+                self.lines[index].clone().into_iter(),
+            )
+        }
+
+        pub fn merge_iter(
+            &'a self,
+        ) -> MergeIter<'a, std::vec::IntoIter<&str>> {
+            MergeIter {
+                lhs: self.info_iter(0).peekable(),
+                rhs: self.info_iter(1).peekable(),
+            }
+        }
+    }
+
     #[test]
     fn test_merge() {
-        let hleft: [usize; 4] = [1, 6, 1, 8];
-        let hright: [usize; 4] = [1, 8, 1, 8];
-
-        let left: Vec<_> =
-            vec!["+1", "+2", " a", "-b", " c", "-d", "+D", " e", " f", "+3"]
-                .iter()
-                .map(|s| s.to_string())
-                .collect();
-
-        let right: Vec<_> = vec![
-            "+0", " 1", "-2", "-a", "+A", " c", "-D", " e", " f", "+2", " 3",
-        ]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
-
-        // let expected: Vec<_> = vec![
-        //     "-a", "-b", "+0", "+1", "+A", " c", "-d", " e", " f", "+2", "+3",
-        // ]
-        // .iter()
-        // .map(|s| s.to_string())
-        // .collect();
-
-        let iter = MergeIter {
-            lhs: InfoIter::new(&hleft, left.iter()).peekable(),
-            rhs: InfoIter::new(&hright, right.iter()).peekable(),
+        let case = Case {
+            headers: [[1, 6, 1, 8], [1, 8, 1, 8]],
+            lines: [
+                vec![
+                    "+1", "+2", " a", "-b", " c", "-d", "+D", " e", " f", "+3",
+                ],
+                vec![
+                    "+0", " 1", "-2", "-a", "+A", " c", "-D", " e", " f",
+                    "+2", " 3",
+                ],
+            ],
+            expected: (
+                [1, 6, 1, 8],
+                vec![
+                    "-a", "-b", "+0", "+1", "+A", " c", "-d", " e", " f",
+                    "+2", "+3",
+                ],
+            ),
         };
 
-        for item in iter {
+        for item in case.merge_iter() {
             println!("{:?}", item);
             if let MergeItem::Err(_) = item {
                 println!("Error");
