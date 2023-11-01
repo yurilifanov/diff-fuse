@@ -13,7 +13,10 @@ impl Header {
     fn parse_file_name(line: &str) -> Result<&str, ParseError> {
         let pat = "Index: ";
         let pos = line.find(pat).ok_or_else(|| {
-            parse_err!("Header: Could not extract file name from line '{}'", line)
+            parse_err!(
+                "Header: Could not extract file name from line '{}'",
+                line
+            )
         })?;
         Ok(&line[pos + pat.len()..])
     }
@@ -23,9 +26,11 @@ impl Header {
             .get(0)
             .ok_or_else(|| parse_err!("Header: Could not fetch first line"))?;
 
-        let _file_name = Header::parse_file_name(first_line.to_owned())?.to_string();
+        let _file_name =
+            Header::parse_file_name(first_line.to_owned())?.to_string();
 
-        let _lines: Vec<String> = lines[..HEADER_SIZE].iter().map(|s| s.to_string()).collect();
+        let _lines: Vec<String> =
+            lines[..HEADER_SIZE].iter().map(|s| s.to_string()).collect();
 
         if _lines.len() != HEADER_SIZE {
             return Err(parse_err!(

@@ -4,7 +4,6 @@ mod merge_iter;
 // use std::cmp::{max, min};
 
 use crate::error::ParseError;
-use crate::hunk::info_iter::InfoIter;
 use crate::macros::parse_err;
 
 #[derive(Debug)]
