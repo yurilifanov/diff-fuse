@@ -274,6 +274,9 @@ impl<'a, T: Iterator<Item = &'a str> + Clone> Iterator for MergeIter<'a, T> {
                 }
                 [Some(la), Some(_), Some(ra), None] => {
                     // lhs maybe changed, rhs added
+                    if la.num < ra.num {
+                        return Some(MergeItem::from(self.lhs.next()));
+                    }
                     return Some(MergeItem::from(self.rhs.next()));
                 }
                 [Some(_), Some(lb), None, Some(_)] => {
@@ -437,6 +440,16 @@ mod tests {
             headers: [[2, 3, 2, 3], [3, 3, 3, 3]],
             lines: [vec![" 2", " 3", " 4"], vec![" 3", " 4", " 5"]],
             expected: ([2, 4, 2, 4], vec![" 2", " 3", " 4", " 5"]),
+        }
+        .run()
+    }
+
+    #[test]
+    fn case_9() {
+        Case {
+            headers: [[1, 3, 1, 3], [3, 1, 3, 3]],
+            lines: [vec![" 1", " 2", " 5"], vec!["+3", "+4", " 5"]],
+            expected: ([1, 3, 1, 5], vec![" 1", " 2", "+3", "+4", " 5"]),
         }
         .run()
     }
