@@ -1,9 +1,8 @@
-use std::iter::{Enumerate, Peekable};
+use std::iter::Peekable;
 
 #[derive(Debug, PartialEq)]
 pub struct Info<'a> {
     pub line: &'a str,
-    pub index: usize,
     pub num: usize,
 }
 
@@ -16,13 +15,13 @@ impl<'a, T: Iterator<Item = &'a str> + Clone> InfoIter<'a, T> {
     pub fn new(header: &[usize; 4], iter: T) -> InfoIter<'a, T> {
         InfoIter {
             after: LineIter::<'a> {
-                iter: iter.clone().enumerate(),
+                iter: iter.clone(),
                 prefix: '+',
                 num: header[2],
             }
             .peekable(),
             before: LineIter::<'a> {
-                iter: iter.enumerate(),
+                iter: iter,
                 prefix: '-',
                 num: header[0],
             }
@@ -51,7 +50,7 @@ impl<'a, T: Iterator<Item = &'a str> + Clone> Iterator for InfoIter<'a, T> {
 }
 
 struct LineIter<'a, T: Iterator<Item = &'a str> + Clone> {
-    iter: Enumerate<T>,
+    iter: T,
     prefix: char,
     num: usize,
 }
@@ -61,11 +60,11 @@ impl<'a, T: Iterator<Item = &'a str> + Clone> Iterator for LineIter<'a, T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let (index, line): (usize, &str) = self.iter.next()?;
+            let line = self.iter.next()?;
             if line.starts_with([' ', self.prefix]) {
                 let num = self.num;
                 self.num += 1;
-                return Some(Info { line, index, num });
+                return Some(Info { line, num });
             }
         }
     }
@@ -82,24 +81,20 @@ mod tests {
         let data: Vec<String> =
             string.chars().map(|c| c.to_string()).collect();
 
-        fn info<'a>(s: &'a str, i: usize, n: usize) -> Option<Info<'a>> {
-            Some(Info {
-                line: s,
-                index: i,
-                num: n,
-            })
+        fn info<'a>(s: &'a str, n: usize) -> Option<Info<'a>> {
+            Some(Info { line: s, num: n })
         }
 
         let header: [usize; 4] = [1, 0, 1, 0];
 
         let expected = [
-            (info("+", 0, 1), None),
-            (info(" ", 1, 2), info(" ", 1, 1)),
-            (info("+", 3, 3), info("-", 2, 2)),
-            (info(" ", 4, 4), info(" ", 4, 3)),
-            (info("+", 5, 5), info("-", 6, 4)),
-            (info(" ", 7, 6), info(" ", 7, 5)),
-            (None, info("-", 8, 6)),
+            (info("+", 1), None),
+            (info(" ", 2), info(" ", 1)),
+            (info("+", 3), info("-", 2)),
+            (info(" ", 4), info(" ", 3)),
+            (info("+", 5), info("-", 4)),
+            (info(" ", 6), info(" ", 5)),
+            (None, info("-", 6)),
         ];
 
         let actual = InfoIter::new(&header, data.iter().map(|s| s.as_str()));
