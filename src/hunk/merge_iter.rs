@@ -9,6 +9,12 @@ struct MergeIter<'a, T: Iterator<Item = &'a str> + Clone> {
     rhs: Peekable<InfoIter<'a, T>>,
 }
 
+fn with_prefix(string: &str, prefix: &str) -> String {
+    let mut result = string[1..].to_string();
+    result.insert_str(0, prefix);
+    result
+}
+
 fn process<'a, T: Iterator<Item = &'a str> + Clone>(
     iter: MergeIter<'a, T>,
 ) -> Result<([usize; 4], Vec<String>), MergeError> {
@@ -30,21 +36,25 @@ fn process<'a, T: Iterator<Item = &'a str> + Clone>(
     };
 
     for item in iter {
+        println!("{:?}", item);
         match item {
-            MergeItem::Single(it) => {
-                lines.push((update_counters(it.line), it.line.to_string()));
+            MergeItem::Single(line) => {
+                lines.push((update_counters(line), line.to_string()));
             }
-            MergeItem::Pair((a, b)) => {
-                if a.line == b.line {
-                    lines.push((update_counters(a.line), a.line.to_string()));
-                } else if a.line[1..] == b.line[1..] {
-                    let mut line = a.line[1..].to_string();
-                    line.insert_str(0, " ");
-                    lines.push((update_counters(" "), line));
+            MergeItem::Pair((b, a)) => {
+                if let Some((_, line)) = lines.last() {
+                    if line[1..] == a[1..] {
+                        lines.pop();
+                        lines
+                            .push((update_counters(" "), with_prefix(a, " ")));
+                    } else {
+                        lines
+                            .push((update_counters("+"), with_prefix(a, "+")));
+                    }
                 } else {
-                    lines.push((update_counters(a.line), a.line.to_string()));
-                    lines.push((update_counters(b.line), b.line.to_string()));
+                    lines.push((update_counters("+"), with_prefix(a, "+")));
                 }
+                lines.push((update_counters("-"), with_prefix(b, "-")));
             }
             MergeItem::Err(err) => {
                 return Err(err);
@@ -125,52 +135,20 @@ fn sort_lines(
 
 #[derive(Debug)]
 enum MergeItem<'a> {
-    Single(Info<'a>),
-    Pair((Info<'a>, Info<'a>)),
+    Single(&'a str),
+    Pair((&'a str, &'a str)),
     Err(MergeError),
 }
 
-type InfoPack<'a> = (Option<Info<'a>>, Option<Info<'a>>);
-
-impl<'a> From<InfoPack<'a>> for MergeItem<'a> {
-    fn from(value: InfoPack<'a>) -> MergeItem<'a> {
+impl<'a> From<Info<'a>> for MergeItem<'a> {
+    fn from(value: Info<'a>) -> MergeItem<'a> {
         match value {
-            (None, None) => MergeItem::Err(merge_err!(
+            (Some(b), Some(a), _) => MergeItem::Pair((b, a)),
+            (None, Some(a), _) => MergeItem::Single(a),
+            (Some(b), None, _) => MergeItem::Single(b),
+            _ => MergeItem::Err(merge_err!(
                 "Cannot build a MergeItem from (None, None)"
             )),
-            (None, Some(before)) => MergeItem::Single(before),
-            (Some(after), None) => MergeItem::Single(after),
-            (Some(after), Some(before)) => MergeItem::Pair((after, before)),
-        }
-    }
-}
-
-type MaybeInfoPack<'a> = Option<InfoPack<'a>>;
-
-impl<'a> From<MaybeInfoPack<'a>> for MergeItem<'a> {
-    fn from(value: MaybeInfoPack<'a>) -> MergeItem<'a> {
-        if let Some(pack) = value {
-            MergeItem::from(pack)
-        } else {
-            MergeItem::Err(merge_err!("Cannot build a MergeItem from (None)"))
-        }
-    }
-}
-
-impl<'a> From<(MaybeInfoPack<'a>, MaybeInfoPack<'a>)> for MergeItem<'a> {
-    fn from(value: (MaybeInfoPack<'a>, MaybeInfoPack<'a>)) -> MergeItem<'a> {
-        if let (Some(lhs), Some(rhs)) = value {
-            match (lhs, rhs) {
-                ((_, Some(lb)), (Some(ra), _)) => MergeItem::Pair((ra, lb)),
-                unsupported => MergeItem::Err(merge_err!(
-                    "Unsupported case: {:?}",
-                    unsupported
-                )),
-            }
-        } else {
-            MergeItem::Err(merge_err!(
-                "Cannot build a MergeItem from (None, None)"
-            ))
         }
     }
 }
@@ -179,145 +157,59 @@ impl<'a, T: Iterator<Item = &'a str> + Clone> Iterator for MergeIter<'a, T> {
     type Item = MergeItem<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let nil: (Option<Info>, Option<Info>) = (None, None);
+        println!("{:?}", (self.lhs.peek(), self.rhs.peek()));
 
-        while self.lhs.peek().is_some() || self.rhs.peek().is_some() {
-            let (lafter, lbefore) = self.lhs.peek().unwrap_or(&nil);
-            let (rafter, rbefore) = self.rhs.peek().unwrap_or(&nil);
-
-            // println!("{:?}", (lafter, lbefore, rafter, rbefore));
-
-            // if can match the line numbers,
-            // bring lhs and rhs to the point where the hunks overlap
-            if let (Some(lhs), Some(rhs)) = (lafter, rbefore) {
-                if lhs.num < rhs.num {
-                    return Some(MergeItem::from(self.lhs.next()));
+        match (self.lhs.peek(), self.rhs.peek()) {
+            (None, None) => None,
+            (None, Some(rhs)) => Some(MergeItem::from(self.rhs.next()?)),
+            (Some(lhs), None) => Some(MergeItem::from(self.lhs.next()?)),
+            (Some((lbefore, lafter, ln)), Some((rbefore, rafter, rn))) => {
+                if ln < rn {
+                    return Some(MergeItem::from(self.lhs.next()?));
                 }
-                if lhs.num > rhs.num {
-                    return Some(MergeItem::from(self.rhs.next()));
+                if ln > rn {
+                    return Some(MergeItem::from(self.rhs.next()?));
                 }
-                if lhs.line[1..] != rhs.line[1..] {
-                    return Some(MergeItem::Err(merge_err!(
-                        "Mismatch at {:?} and {:?}",
-                        lhs,
-                        rhs
-                    )));
-                }
-            }
-
-            // 4 ^ 2 = 16 cases
-            match [lafter, lbefore, rafter, rbefore] {
-                // la, lb, ra, rb
-                [Some(_), None, None, None] => {
-                    return Some(MergeItem::from(self.lhs.next()));
-                }
-                [None, Some(_), None, None] => {
-                    return Some(MergeItem::from(self.lhs.next()));
-                }
-                [None, None, Some(_), None] => {
-                    return Some(MergeItem::from(self.rhs.next()));
-                }
-                [None, None, None, Some(_)] => {
-                    return Some(MergeItem::from(self.rhs.next()));
-                }
-                [Some(_), Some(_), None, None] => {
-                    // rhs empty
-                    return Some(MergeItem::from(self.lhs.next()));
-                }
-                [None, None, Some(_), Some(_)] => {
-                    // lhs empty
-                    return Some(MergeItem::from(self.rhs.next()));
-                }
-                [Some(la), None, Some(ra), None] => {
-                    // both added a line
-                    // no rb, so this can only be outside of lhs-rhs overlap
-                    if la.num < ra.num {
-                        return Some(MergeItem::from(self.lhs.next()));
-                    }
-                    return Some(MergeItem::from(self.rhs.next()));
-                }
-                [Some(_), None, None, Some(_)] => {
-                    // lhs added - rhs removed, so skip
-                    self.lhs.next();
-                    self.rhs.next();
-                }
-                [None, Some(lb), Some(ra), None] => {
-                    // lhs removed, rhs added
-                    // change may have been reverted
-                    return Some(MergeItem::from((
-                        self.lhs.next(),
-                        self.rhs.next(),
-                    )));
-                }
-                [None, Some(_), None, Some(_)] => {
-                    // both removed a line
-                    // no la, so this can only be outside of lhs-rhs overlap
-                    return Some(MergeItem::from(self.rhs.next()));
-                }
-                [None, Some(_), Some(_), Some(_)] => {
-                    // lhs removed, rhs maybe changed
-                    return Some(MergeItem::from(self.lhs.next()));
-                }
-                [Some(_), None, Some(ra), Some(_)] => {
-                    // lhs added, rhs maybe changed
-                    if ra.line.starts_with('+') {
-                        self.lhs.next();
-                        if let Some((Some(after), Some(_))) = self.rhs.next() {
-                            return Some(MergeItem::Single(after));
-                        }
-                    } else {
-                        self.rhs.next();
-                        if let Some((Some(after), _)) = self.lhs.next() {
-                            return Some(MergeItem::Single(after));
-                        }
-                    }
-                }
-                [Some(la), Some(_), Some(ra), None] => {
-                    // lhs maybe changed, rhs added
-                    if la.num < ra.num {
-                        return Some(MergeItem::from(self.lhs.next()));
-                    }
-                    return Some(MergeItem::from(self.rhs.next()));
-                }
-                [Some(_), Some(lb), None, Some(_)] => {
-                    // lhs maybe changed, rhs removed
-                    if lb.line.starts_with('-') {
-                        self.rhs.next();
-                        if let Some((Some(_), Some(before))) = self.lhs.next()
-                        {
-                            return Some(MergeItem::Single(before));
-                        }
-                    } else {
-                        self.lhs.next();
-                        if let Some((_, Some(before))) = self.rhs.next() {
-                            return Some(MergeItem::Single(before));
-                        }
-                    }
-                }
-                [Some(_), Some(lb), Some(ra), Some(_)] => {
-                    // both maybe changed
-                    if lb.line.starts_with('-') && ra.line.starts_with('+') {
-                        return Some(MergeItem::from((
-                            self.lhs.next(),
-                            self.rhs.next(),
+                if let (Some(lhs), Some(rhs)) = (lafter, rbefore) {
+                    if lhs[1..] != rhs[1..] {
+                        return Some(MergeItem::Err(merge_err!(
+                            "Conflict at ({}, {})",
+                            lhs,
+                            rhs
                         )));
-                    } else if lb.line.starts_with('-') {
-                        self.rhs.next();
-                        return Some(MergeItem::from(self.lhs.next()));
-                    } else {
-                        self.lhs.next();
-                        return Some(MergeItem::from(self.rhs.next()));
                     }
                 }
-                array => {
-                    return Some(MergeItem::Err(merge_err!(
-                        "Unexpected case: {:?}",
-                        array
-                    )));
+                match (lbefore, lafter, rbefore, rafter) {
+                    (Some(lb), _, _, Some(ra)) => {
+                        if lb == ra {
+                            self.lhs.next();
+                            return Some(MergeItem::Single(
+                                self.rhs.next()?.1?,
+                            ));
+                        }
+                        Some(MergeItem::Pair((
+                            self.lhs.next()?.0?,
+                            self.rhs.next()?.1?,
+                        )))
+                    }
+                    (None, Some(_), Some(rb), Some(ra)) => {
+                        if rb == ra {
+                            self.rhs.next();
+                            return Some(MergeItem::Single(
+                                self.lhs.next()?.1?,
+                            ));
+                        }
+                        self.lhs.next();
+                        Some(MergeItem::Single(self.rhs.next()?.1?))
+                    }
+                    (Some(_), Some(_), _, None) => {
+                        self.rhs.next();
+                        Some(MergeItem::from(self.lhs.next()?))
+                    }
+                    _ => todo!(),
                 }
             }
         }
-        None
     }
 }
 
@@ -445,7 +337,7 @@ mod tests {
     }
 
     #[test]
-    fn case_9() {
+    fn case_8() {
         Case {
             headers: [[1, 3, 1, 3], [3, 1, 3, 3]],
             lines: [vec![" 1", " 2", " 5"], vec!["+3", "+4", " 5"]],

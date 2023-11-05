@@ -1,8 +1,7 @@
 use core::cmp::Ordering;
-use core::iter::Filter;
 use std::iter::Peekable;
 
-type Info<'a> = (Option<&'a str>, Option<&'a str>, usize);
+pub type Info<'a> = (Option<&'a str>, Option<&'a str>, usize);
 
 pub struct InfoIter<'a, T: Iterator<Item = &'a str> + Clone> {
     after: Peekable<LineIter<'a, T>>,
@@ -43,32 +42,32 @@ impl<'a, T: Iterator<Item = &'a str> + Clone> Iterator for InfoIter<'a, T> {
         match (self.after.peek(), self.before.peek()) {
             (Some(a), Some(b)) => match self.num_after.cmp(&self.num_before) {
                 Ordering::Greater => Some((
-                    None,
                     self.before.next(),
+                    None,
                     post_increment(&mut self.num_before),
                 )),
                 Ordering::Less => Some((
-                    self.after.next(),
                     None,
+                    self.after.next(),
                     post_increment(&mut self.num_after),
                 )),
                 _ => {
                     self.num_before += 1;
                     Some((
-                        self.after.next(),
                         self.before.next(),
+                        self.after.next(),
                         post_increment(&mut self.num_after),
                     ))
                 }
             },
             (Some(_), None) => Some((
-                self.after.next(),
                 None,
+                self.after.next(),
                 post_increment(&mut self.num_after),
             )),
             (None, Some(_)) => Some((
-                None,
                 self.before.next(),
+                None,
                 post_increment(&mut self.num_after),
             )),
             _ => None,
@@ -120,12 +119,12 @@ mod tests {
         let header: [usize; 4] = [1, 0, 1, 0];
         let line = "+ -+ +- -";
         let expected: Vec<Info> = vec![
-            (Some("+"), Some(" "), 1),
-            (Some(" "), Some("-"), 2),
-            (Some("+"), Some(" "), 3),
-            (Some(" "), Some("-"), 4),
-            (Some("+"), Some(" "), 5),
-            (Some(" "), Some("-"), 6),
+            (Some(" "), Some("+"), 1),
+            (Some("-"), Some(" "), 2),
+            (Some(" "), Some("+"), 3),
+            (Some("-"), Some(" "), 4),
+            (Some(" "), Some("+"), 5),
+            (Some("-"), Some(" "), 6),
         ];
         test(header, split(line), expected);
     }
@@ -135,9 +134,9 @@ mod tests {
         let header: [usize; 4] = [3, 0, 1, 0];
         let line = "+++- ";
         let expected: Vec<Info> = vec![
-            (Some("+"), None, 1),
-            (Some("+"), None, 2),
-            (Some("+"), Some("-"), 3),
+            (None, Some("+"), 1),
+            (None, Some("+"), 2),
+            (Some("-"), Some("+"), 3),
             (Some(" "), Some(" "), 4),
         ];
         test(header, split(line), expected);
