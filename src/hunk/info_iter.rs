@@ -1,94 +1,76 @@
 use core::cmp::Ordering;
-use std::iter::Peekable;
 
-pub type Info<'a> = (Option<&'a str>, Option<&'a str>, usize);
-
-pub struct InfoIter<'a, T: Iterator<Item = &'a str> + Clone> {
-    after: Peekable<LineIter<'a, T>>,
-    before: Peekable<LineIter<'a, T>>,
-    num_after: usize,
-    num_before: usize,
+#[derive(Debug, PartialEq)]
+pub struct Info<'a> {
+    pub line: &'a str,
+    pub minus_num: usize,
+    pub plus_num: usize,
 }
 
-impl<'a, T: Iterator<Item = &'a str> + Clone> InfoIter<'a, T> {
-    pub fn new(header: &[usize; 4], iter: T) -> InfoIter<'a, T> {
-        InfoIter {
-            after: LineIter::<'a> {
-                iter: iter.clone(),
-                prefix: '+',
-            }
-            .peekable(),
-            before: LineIter::<'a> {
-                iter: iter,
-                prefix: '-',
-            }
-            .peekable(),
-            num_after: header[2],
-            num_before: header[0],
+impl Info<'_> {
+    pub fn prefix(&self) -> char {
+        self.line.chars().nth(0).unwrap_or(' ')
+    }
+
+    pub fn cmp(&self, other: &Info) -> Ordering {
+        match [self.prefix(), other.prefix()] {
+            ['-', ' '] => Ordering::Equal,
+            ['-', '-'] => self.minus_num.cmp(&other.minus_num),
+            ['-', '+'] => self.minus_num.cmp(&other.plus_num),
+            ['+', ' '] => self.plus_num.cmp(&other.minus_num),
+            ['+', '-'] => self.plus_num.cmp(&other.minus_num),
+            ['+', '+'] => self.plus_num.cmp(&other.plus_num),
+            [' ', '-'] => self.plus_num.cmp(&other.minus_num),
+            [' ', '+'] => self.plus_num.cmp(&other.plus_num),
+            _ => self.plus_num.cmp(&other.minus_num),
         }
     }
 }
 
-fn post_increment(reference: &mut usize) -> usize {
-    let prev: usize = *reference;
-    *reference += 1;
-    prev
+pub struct InfoIter<'a, T: Iterator<Item = &'a str>> {
+    line_iter: T,
+    minus_num: usize,
+    plus_num: usize,
 }
 
-impl<'a, T: Iterator<Item = &'a str> + Clone> Iterator for InfoIter<'a, T> {
+impl<'a, T: Iterator<Item = &'a str>> InfoIter<'a, T> {
+    pub fn new(header: &[usize; 4], iter: T) -> InfoIter<'a, T> {
+        InfoIter {
+            line_iter: iter,
+            minus_num: header[0] - 1,
+            plus_num: header[2] - 1,
+        }
+    }
+}
+
+fn pre_increment(reference: &mut usize) -> usize {
+    *reference += 1;
+    *reference
+}
+
+impl<'a, T: Iterator<Item = &'a str>> Iterator for InfoIter<'a, T> {
     type Item = Info<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match (self.after.peek(), self.before.peek()) {
-            (Some(a), Some(b)) => match self.num_after.cmp(&self.num_before) {
-                Ordering::Greater => Some((
-                    self.before.next(),
-                    None,
-                    post_increment(&mut self.num_before),
-                )),
-                Ordering::Less => Some((
-                    None,
-                    self.after.next(),
-                    post_increment(&mut self.num_after),
-                )),
-                _ => {
-                    self.num_before += 1;
-                    Some((
-                        self.before.next(),
-                        self.after.next(),
-                        post_increment(&mut self.num_after),
-                    ))
-                }
-            },
-            (Some(_), None) => Some((
-                None,
-                self.after.next(),
-                post_increment(&mut self.num_after),
-            )),
-            (None, Some(_)) => Some((
-                self.before.next(),
-                None,
-                post_increment(&mut self.num_after),
-            )),
-            _ => None,
-        }
-    }
-}
-
-struct LineIter<'a, T: Iterator<Item = &'a str> + Clone> {
-    iter: T,
-    prefix: char,
-}
-
-impl<'a, T: Iterator<Item = &'a str> + Clone> Iterator for LineIter<'a, T> {
-    type Item = &'a str;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            let line = self.iter.next()?;
-            if line.starts_with([' ', self.prefix]) {
-                return Some(line);
-            }
+        let line = self.line_iter.next()?;
+        if line.starts_with('-') {
+            Some(Info {
+                line,
+                minus_num: pre_increment(&mut self.minus_num),
+                plus_num: self.plus_num,
+            })
+        } else if line.starts_with('+') {
+            Some(Info {
+                line,
+                minus_num: self.minus_num,
+                plus_num: pre_increment(&mut self.plus_num),
+            })
+        } else {
+            Some(Info {
+                line,
+                minus_num: pre_increment(&mut self.minus_num),
+                plus_num: pre_increment(&mut self.plus_num),
+            })
         }
     }
 }
@@ -96,6 +78,7 @@ impl<'a, T: Iterator<Item = &'a str> + Clone> Iterator for LineIter<'a, T> {
 #[cfg(test)]
 mod tests {
     use crate::hunk::info_iter::{Info, InfoIter};
+    type MockInfo<'a> = (&'a str, usize, usize);
 
     fn split(line: &str) -> impl Iterator<Item = &str> + Clone {
         line.char_indices()
@@ -106,11 +89,19 @@ mod tests {
     fn test<'a, T: Iterator<Item = &'a str> + Clone>(
         header: [usize; 4],
         lines: T,
-        expected: Vec<Info>,
+        expected: Vec<MockInfo>,
     ) {
         let actual = InfoIter::new(&header, lines);
         for (act, exp) in actual.zip(expected.iter()) {
-            assert_eq!(act, *exp);
+            let (line, minus_num, plus_num) = *exp;
+            assert_eq!(
+                act,
+                Info {
+                    line,
+                    minus_num,
+                    plus_num
+                }
+            );
         }
     }
 
@@ -118,13 +109,16 @@ mod tests {
     fn case_1() {
         let header: [usize; 4] = [1, 0, 1, 0];
         let line = "+ -+ +- -";
-        let expected: Vec<Info> = vec![
-            (Some(" "), Some("+"), 1),
-            (Some("-"), Some(" "), 2),
-            (Some(" "), Some("+"), 3),
-            (Some("-"), Some(" "), 4),
-            (Some(" "), Some("+"), 5),
-            (Some("-"), Some(" "), 6),
+        let expected: Vec<MockInfo> = vec![
+            ("+", 0, 1),
+            (" ", 1, 2),
+            ("-", 2, 2),
+            ("+", 2, 3),
+            (" ", 3, 4),
+            ("+", 3, 5),
+            ("-", 4, 5),
+            (" ", 5, 6),
+            ("-", 6, 6),
         ];
         test(header, split(line), expected);
     }
@@ -133,11 +127,12 @@ mod tests {
     fn case_2() {
         let header: [usize; 4] = [3, 0, 1, 0];
         let line = "+++- ";
-        let expected: Vec<Info> = vec![
-            (None, Some("+"), 1),
-            (None, Some("+"), 2),
-            (Some("-"), Some("+"), 3),
-            (Some(" "), Some(" "), 4),
+        let expected: Vec<MockInfo> = vec![
+            ("+", 2, 1),
+            ("+", 2, 2),
+            ("+", 2, 3),
+            ("-", 3, 3),
+            (" ", 4, 4),
         ];
         test(header, split(line), expected);
     }
