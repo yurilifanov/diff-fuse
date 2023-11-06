@@ -1,5 +1,5 @@
 use crate::error::MergeError;
-use crate::hunk::info_iter::{Info, InfoIter};
+use crate::hunk::info_iter::InfoIter;
 use crate::macros::merge_err;
 use core::cmp::{min, Ordering};
 use std::iter::Peekable;
@@ -52,7 +52,11 @@ fn process<'a, T: Iterator<Item = &'a str> + Clone>(
         }
     };
 
-    let lines = iter.map(|line| (update_counters(&line), line)).collect();
+    let mut lines: Vec<((usize, usize), String)> = Vec::new();
+    for item in iter {
+        let line = item?;
+        lines.push((update_counters(&line), line));
+    }
 
     Ok((
         header,
@@ -126,34 +130,33 @@ fn sort_lines(
 }
 
 impl<'a, T: Iterator<Item = &'a str> + Clone> Iterator for MergeIter<'a, T> {
-    type Item = String;
+    type Item = Result<String, MergeError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // println!("{:?}", (self.lhs.peek(), self.rhs.peek()));
+        let some_ok = |s: String| -> Option<Self::Item> { Some(Ok(s)) };
+
+        let some_ok_string =
+            |s: &str| -> Option<Self::Item> { some_ok(s.to_string()) };
 
         loop {
             match (self.lhs.peek(), self.rhs.peek()) {
                 (None, None) => {
                     return None;
                 }
-                (None, Some(rhs)) => {
-                    return Some(self.rhs.next()?.line.to_string());
+                (None, Some(_)) => {
+                    return some_ok_string(self.rhs.next()?.line);
                 }
-                (Some(lhs), None) => {
-                    return Some(self.lhs.next()?.line.to_string());
+                (Some(_), None) => {
+                    return some_ok_string(self.lhs.next()?.line);
                 }
                 (Some(lhs), Some(rhs)) => {
                     if !self.synced {
                         match lhs.cmp(&rhs) {
                             Ordering::Less => {
-                                return Some(
-                                    self.lhs.next()?.line.to_string(),
-                                );
+                                return some_ok_string(self.lhs.next()?.line);
                             }
                             Ordering::Greater => {
-                                return Some(
-                                    self.rhs.next()?.line.to_string(),
-                                );
+                                return some_ok_string(self.rhs.next()?.line);
                             }
                             _ => {
                                 self.synced = true;
@@ -162,49 +165,39 @@ impl<'a, T: Iterator<Item = &'a str> + Clone> Iterator for MergeIter<'a, T> {
                     }
                     match [lhs.prefix(), rhs.prefix()] {
                         ['+', '+'] => {
-                            return Some(self.rhs.next()?.line.to_string());
+                            return some_ok_string(self.rhs.next()?.line);
                         }
                         ['-', '-'] => {
-                            return Some(self.lhs.next()?.line.to_string());
+                            return some_ok_string(self.lhs.next()?.line);
                         }
                         ['-', ' '] => {
-                            return Some(self.lhs.next()?.line.to_string());
+                            return some_ok_string(self.lhs.next()?.line);
                         }
                         [' ', _] => {
                             if lhs.line[1..] == rhs.line[1..] {
                                 self.lhs.next();
-                                return Some(
-                                    self.rhs.next()?.line.to_string(),
-                                );
+                                return some_ok_string(self.rhs.next()?.line);
                             } else {
-                                return Some(
-                                    self.rhs.next()?.line.to_string(),
-                                );
+                                return some_ok_string(self.rhs.next()?.line);
                             }
                         }
                         ['-', '+'] => {
                             if lhs.line[1..] == rhs.line[1..] {
                                 self.lhs.next();
-                                return Some(format!(
+                                return some_ok(format!(
                                     " {}",
                                     &self.rhs.next()?.line[1..],
                                 ));
                             } else {
-                                return Some(
-                                    self.lhs.next()?.line.to_string(),
-                                );
+                                return some_ok_string(self.lhs.next()?.line);
                             }
                         }
                         ['+', ' '] => {
                             if lhs.line[1..] == rhs.line[1..] {
                                 self.rhs.next();
-                                return Some(
-                                    self.lhs.next()?.line.to_string(),
-                                );
+                                return some_ok_string(self.lhs.next()?.line);
                             } else {
-                                return Some(
-                                    self.rhs.next()?.line.to_string(),
-                                );
+                                return some_ok_string(self.rhs.next()?.line);
                             }
                         }
                         ['+', '-'] => {
@@ -212,12 +205,14 @@ impl<'a, T: Iterator<Item = &'a str> + Clone> Iterator for MergeIter<'a, T> {
                                 self.lhs.next();
                                 self.rhs.next();
                             } else {
-                                return Some(
-                                    self.rhs.next()?.line.to_string(),
-                                );
+                                return some_ok_string(self.rhs.next()?.line);
                             }
                         }
-                        _ => todo!(), // TODO: Error
+                        [lp, rp] => {
+                            return Some(Err(merge_err!(
+                                "Unexpected prefix combination [{lp}, {rp}]"
+                            )));
+                        }
                     }
                 }
             }
@@ -227,7 +222,6 @@ impl<'a, T: Iterator<Item = &'a str> + Clone> Iterator for MergeIter<'a, T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::hunk::info_iter::InfoIter;
     use crate::hunk::merge_iter::{process, MergeIter};
 
     struct Case<'a> {
