@@ -345,4 +345,14 @@ mod tests {
         }
         .run()
     }
+
+    #[test]
+    fn case_9() {
+        Case {
+            headers: ([1, 0, 1, 1], [1, 1, 1, 0]),
+            lines: (vec!["+1"], vec!["-1"]),
+            expected: ([1, 0, 1, 0], vec![]),
+        }
+        .run()
+    }
 }
