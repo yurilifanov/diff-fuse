@@ -32,8 +32,9 @@ fn process<'a, T: Iterator<Item = &'a str> + Clone>(
     iter: MergeIter<'a, T>,
 ) -> Result<([usize; 4], Vec<String>), MergeError> {
     let mut header: [usize; 4] = [iter.start_nums.0, 0, iter.start_nums.1, 0];
-    let mut counters: (usize, usize, usize) = (0, 0, 0); // group, index, line
+    let mut counters: (usize, usize, usize) = (0, 0, 0);
 
+    // returns (group, index)
     let mut update_counters = |s: &String| {
         if s.starts_with('-') {
             counters.1 += 1;
