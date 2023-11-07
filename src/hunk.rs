@@ -1,9 +1,9 @@
 mod info_iter;
 mod merge_iter;
 
-// use std::cmp::{max, min};
-
-use crate::error::ParseError;
+use crate::error::{MergeError, ParseError};
+use crate::hunk::merge_iter::{process, MergeIter};
+use crate::macros::merge_err;
 use crate::macros::parse_err;
 
 #[derive(Debug)]
@@ -76,6 +76,22 @@ impl Hunk {
         parse(fields)
     }
 
+    fn serialize_header(header: &[usize; 4]) -> String {
+        let [mut mmin, mnum, mut pmin, pnum] = header;
+        if *mnum == 0 {
+            mmin = 0;
+        }
+        if *pnum == 0 {
+            pmin = 0;
+        }
+        match [mnum, pnum] {
+            [1, 1] => format!("@@ -{mmin} +{pmin} @@"),
+            [_, 1] => format!("@@ -{mmin},{mnum} +{pmin} @@"),
+            [1, _] => format!("@@ -{mmin} +{pmin},{pnum} @@"),
+            _ => format!("@@ -{mmin},{mnum} +{pmin},{pnum} @@"),
+        }
+    }
+
     pub fn parse(lines: &[&str]) -> Result<Hunk, ParseError> {
         let first = lines
             .get(0)
@@ -98,60 +114,86 @@ impl Hunk {
         &self._lines
     }
 
-    // fn start_number(&self) -> usize {
-    //     min(self._header[0], self._header[2])
-    // }
-    //
-    // fn end_number(&self) -> usize {
-    //     self.start_number() + max(self._header[1], self._header[3])
-    // }
-    //
-    // fn number_range(&self) -> [usize; 2] {
-    //     [self.start_number(), self.end_number()]
-    // }
-    //
-    // pub fn overlaps(&self, other: &Hunk) -> bool {
-    //     let [this_start, this_end] = self.number_range();
-    //     let [that_start, that_end] = other.number_range();
-    //     return this_start <= that_end && this_end >= that_start;
-    // }
+    fn minus_range(&self) -> [usize; 2] {
+        [self._header[0], self._header[0] + self._header[1]]
+    }
 
-    // fn line_iter(&self) -> LineIter {
-    //     LineIter::new(self._lines[1..].iter()) // skip header
-    // }
+    fn plus_range(&self) -> [usize; 2] {
+        [self._header[2], self._header[2] + self._header[3]]
+    }
+
+    pub fn overlaps(&self, other: &Hunk) -> bool {
+        {
+            let [lhs_min, lhs_max] = self.minus_range();
+            let [rhs_min, rhs_max] = self.minus_range();
+            if lhs_min <= rhs_max && rhs_min <= lhs_max {
+                return true;
+            }
+        }
+        {
+            let [lhs_min, lhs_max] = self.plus_range();
+            let [rhs_min, rhs_max] = self.plus_range();
+            if lhs_min <= rhs_max && rhs_min <= lhs_max {
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn merge<'a>(&'a self, other: &'a Hunk) -> Result<Hunk, MergeError> {
+        let as_str = |s: &'a String| -> &'a str { s.as_str() };
+        let (_header, mut _lines) = process(MergeIter::new(
+            (self._header, other._header),
+            (
+                self._lines[1..].iter().map(as_str),
+                other._lines[1..].iter().map(as_str),
+            ),
+        ))?;
+        _lines.insert(0, Self::serialize_header(&_header));
+        Ok(Hunk { _header, _lines })
+    }
 }
 
-// #[cfg(test)]
-// mod test_merge {
-//     use crate::hunk::Hunk;
-//
-//     #[test]
-//     fn case_1() {
-//         let left = "\
-// @@ -1 +1 @@
-// -a
-// +b
-// "
-//         .lines()
-//         .collect::<Vec<&str>>();
-//         let right = "\
-// @@ -1 +1,2 @@
-// -b
-// +c
-// +d
-// "
-//         .lines()
-//         .collect::<Vec<&str>>();
-//         let expected = "\
-// @@ -1 +1,2 @@
-// -b
-// +c
-// +d
-// "
-//         .lines()
-//         .collect::<Vec<&str>>();
-//
-//         let first = Hunk::parse(&left[..]).unwrap();
-//         let second = Hunk::parse(&right[..]).unwrap();
-//     }
-// }
+#[cfg(test)]
+mod test_merge {
+    use crate::hunk::Hunk;
+
+    #[test]
+    fn case_1() {
+        let left = "\
+@@ -1 +1 @@
+-a
++b
+"
+        .lines()
+        .collect::<Vec<&str>>();
+        let right = "\
+@@ -1 +1,2 @@
+-b
++c
++d
+"
+        .lines()
+        .collect::<Vec<&str>>();
+        let expected = "\
+@@ -1 +1,2 @@
+-a
++c
++d
+"
+        .lines()
+        .collect::<Vec<&str>>();
+
+        let first = Hunk::parse(&left[..]).unwrap();
+        let second = Hunk::parse(&right[..]).unwrap();
+
+        match first.merge(&second) {
+            Ok(merged) => {
+                let actual: Vec<_> =
+                    merged._lines.iter().map(|s| s.as_str()).collect();
+                assert_eq!(actual, expected);
+            }
+            Err(err) => panic!("{:?}", err),
+        }
+    }
+}

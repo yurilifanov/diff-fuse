@@ -4,7 +4,7 @@ use crate::macros::merge_err;
 use core::cmp::{min, Ordering};
 use std::iter::Peekable;
 
-struct MergeIter<'a, T: Iterator<Item = &'a str> + Clone> {
+pub struct MergeIter<'a, T: Iterator<Item = &'a str> + Clone> {
     lhs: Peekable<InfoIter<'a, T>>,
     rhs: Peekable<InfoIter<'a, T>>,
     start_nums: (usize, usize),
@@ -12,7 +12,7 @@ struct MergeIter<'a, T: Iterator<Item = &'a str> + Clone> {
 }
 
 impl<'a, T: Iterator<Item = &'a str> + Clone> MergeIter<'a, T> {
-    fn new(
+    pub fn new(
         headers: ([usize; 4], [usize; 4]),
         lines: (T, T),
     ) -> MergeIter<'a, T> {
@@ -28,7 +28,7 @@ impl<'a, T: Iterator<Item = &'a str> + Clone> MergeIter<'a, T> {
     }
 }
 
-fn process<'a, T: Iterator<Item = &'a str> + Clone>(
+pub fn process<'a, T: Iterator<Item = &'a str> + Clone>(
     iter: MergeIter<'a, T>,
 ) -> Result<([usize; 4], Vec<String>), MergeError> {
     let mut header: [usize; 4] = [iter.start_nums.0, 0, iter.start_nums.1, 0];

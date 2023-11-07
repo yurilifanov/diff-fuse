@@ -2,6 +2,13 @@ all: build svn
 
 TARGETS := generate-svn/merge/success/1 generate-svn/merge/success/2
 
+# For when "Error: failed to connect: dial tcp 127.0.0.1:XXXXX: ..."
+# TODO: maybe podman-restart is enough?
+podman-reset-vm:
+	podman machine rm podman-machine-default
+	podman machine init
+	podman machine start
+
 # For when "Error: statfs ... no such file or directory"
 podman-restart:
 	podman machine stop
