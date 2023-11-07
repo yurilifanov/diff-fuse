@@ -77,11 +77,11 @@ impl Hunk {
     }
 
     fn serialize_header(header: &[usize; 4]) -> String {
-        let [mut mmin, mnum, mut pmin, pnum] = header;
-        if *mnum == 0 {
+        let [mut mmin, mnum, mut pmin, pnum] = *header;
+        if mnum == 0 {
             mmin = 0;
         }
-        if *pnum == 0 {
+        if pnum == 0 {
             pmin = 0;
         }
         match [mnum, pnum] {
