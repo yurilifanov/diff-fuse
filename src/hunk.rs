@@ -21,7 +21,7 @@ fn parse_usize(string: &&str) -> Result<usize, ParseError> {
         .parse::<i64>()
         .map(|val| val.wrapping_abs() as usize)
         .map_err(|_| {
-            parse_err!("Hunk header: Could not parse i64 from {}", string)
+            parse_err!("Hunk header: Could not parse i64 from {string}")
         })
 }
 
@@ -34,11 +34,7 @@ fn parse_n<const N: usize>(
         .collect::<Vec<usize>>()
         .try_into()
         .map_err(|_| {
-            parse_err!(
-                "Hunk header: Expected {} integers, got {:?}",
-                N,
-                values
-            )
+            parse_err!("Hunk header: Expected {N} integers, got {values:?}")
         })
 }
 
@@ -57,8 +53,7 @@ fn parse(values: Vec<&str>) -> Result<[usize; 4], ParseError> {
         }
         4 => parse_n::<4>(&values),
         _ => Err(parse_err!(
-            "Hunk header: Unexpected number of fields - {:?}",
-            values
+            "Hunk header: Unexpected number of fields - {values:?}"
         )),
     }
 }
@@ -70,7 +65,7 @@ impl Hunk {
             .map_or_else(|| None, |s| s.strip_suffix(" @@"))
             .map(split)
             .ok_or_else(|| {
-                parse_err!("Hunk: Could not parse header from '{}'", line)
+                parse_err!("Hunk: Could not parse header from '{line}'")
             })?;
 
         parse(fields)
@@ -125,14 +120,14 @@ impl Hunk {
     pub fn overlaps(&self, other: &Hunk) -> bool {
         {
             let [lhs_min, lhs_max] = self.minus_range();
-            let [rhs_min, rhs_max] = self.minus_range();
+            let [rhs_min, rhs_max] = other.minus_range();
             if lhs_min <= rhs_max && rhs_min <= lhs_max {
                 return true;
             }
         }
         {
             let [lhs_min, lhs_max] = self.plus_range();
-            let [rhs_min, rhs_max] = self.plus_range();
+            let [rhs_min, rhs_max] = other.plus_range();
             if lhs_min <= rhs_max && rhs_min <= lhs_max {
                 return true;
             }
@@ -141,6 +136,13 @@ impl Hunk {
     }
 
     pub fn merge<'a>(&'a self, other: &'a Hunk) -> Result<Hunk, MergeError> {
+        if !self.overlaps(other) {
+            return Err(merge_err!(
+                "Expected hunks {:?} and {:?} to overlap, but they do not",
+                self._header,
+                other._header
+            ));
+        }
         let as_str = |s: &'a String| -> &'a str { s.as_str() };
         let (_header, mut _lines) = process(MergeIter::new(
             (self._header, other._header),
