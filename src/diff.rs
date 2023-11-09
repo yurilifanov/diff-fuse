@@ -1,9 +1,11 @@
 use std::collections::HashMap;
+use std::fs;
 use std::iter::zip;
+use std::path::PathBuf;
 use std::slice::Iter;
 use std::str::FromStr;
 
-use crate::error::ParseError;
+use crate::error::{MergeError, ParseError};
 use crate::file_diff;
 use crate::file_diff::FileDiff;
 use crate::macros::{debugln, parse_err};
@@ -41,6 +43,12 @@ impl<'a> Iterator for LineIter<'a> {
 }
 
 impl Diff {
+    pub fn read(path: &PathBuf) -> Result<Diff, ParseError> {
+        debugln!("Reading {}", path.display());
+        let data = fs::read_to_string(path)?;
+        Ok(Self::from(data.parse()?))
+    }
+
     pub fn parse(lines: &[&str]) -> Result<Diff, ParseError> {
         let mut view = &lines[..];
         let mut _order: Vec<String> = Vec::new();
@@ -71,6 +79,26 @@ impl Diff {
             _file_iter: self._order.iter(),
             _line_iter: file_diff::LineIter::default(),
         }
+    }
+
+    pub fn merge(&self, other: &Diff) -> Result<Diff, MergeError> {
+        let mut _order: Vec<String> = Vec::new();
+        let mut _map: HashMap<String, FileDiff> = HashMap::new();
+        for (key, val) in other._map.iter() {
+            if let Some(diff) = self._map.get(key) {
+                _map.insert(key.clone(), diff.merge(val)?);
+            } else {
+                _map.insert(key.clone(), val.clone());
+            }
+            _order.push(key.clone());
+        }
+        for (key, val) in self._map.iter() {
+            if !_map.contains_key(key) {
+                _map.insert(key.clone(), val.clone());
+                _order.push(key.clone());
+            }
+        }
+        Ok(Diff { _order, _map })
     }
 }
 

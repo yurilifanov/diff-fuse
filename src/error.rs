@@ -20,6 +20,14 @@ impl Display for ParseError {
 
 impl Error for ParseError {}
 
+impl From<std::io::Error> for ParseError {
+    fn from(err: std::io::Error) -> ParseError {
+        ParseError {
+            _msg: format!("IOError: {err:?}"),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct MergeError {
     _msg: String,

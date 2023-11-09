@@ -3,7 +3,7 @@ use crate::macros::parse_err;
 
 const HEADER_SIZE: usize = 4;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Header {
     _lines: Vec<String>,
     _file_name: String,

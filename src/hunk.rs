@@ -3,10 +3,10 @@ mod merge_iter;
 
 use crate::error::{MergeError, ParseError};
 use crate::hunk::merge_iter::{process, MergeIter};
-use crate::macros::merge_err;
-use crate::macros::parse_err;
+use crate::macros::{merge_err, parse_err};
+use core::cmp::{min, Ordering};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Hunk {
     _lines: Vec<String>,
     _header: [usize; 4],
@@ -85,6 +85,12 @@ impl Hunk {
             [1, _] => format!("@@ -{mmin} +{pmin},{pnum} @@"),
             _ => format!("@@ -{mmin},{mnum} +{pmin},{pnum} @@"),
         }
+    }
+
+    pub fn cmp(&self, other: &Hunk) -> Ordering {
+        let [lhs_mmin, _, lhs_pmin, _] = self._header;
+        let [rhs_mmin, _, rhs_pmin, _] = other._header;
+        min(lhs_mmin, lhs_pmin).cmp(min(&rhs_mmin, &rhs_pmin))
     }
 
     pub fn parse(lines: &[&str]) -> Result<Hunk, ParseError> {
