@@ -162,6 +162,16 @@ impl Hunk {
     }
 }
 
+impl std::fmt::Display for Hunk {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(line) = self._lines.get(0) {
+            write!(f, "{}", &line)
+        } else {
+            write!(f, "[no lines; header = {:?}]", self._header)
+        }
+    }
+}
+
 #[cfg(test)]
 mod test_merge {
     use crate::hunk::Hunk;

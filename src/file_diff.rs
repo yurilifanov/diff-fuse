@@ -50,7 +50,7 @@ impl FileDiff {
 
         loop {
             let hunk = Hunk::parse(view)?;
-            debugln!("Got hunk {:?}", hunk);
+            debugln!("Parsed hunk {hunk}");
 
             let hunk_lines = hunk.lines().len();
             _num_lines += hunk_lines;
@@ -112,6 +112,7 @@ impl FileDiff {
             ));
         }
 
+        debugln!("Merging {lhs_file}");
         let mut lhs = self._hunks.iter().peekable();
         let mut rhs = other._hunks.iter().peekable();
 
@@ -139,6 +140,9 @@ impl FileDiff {
                     if !next.overlaps(peek) {
                         return Some(Ok(next.clone()));
                     }
+
+                    // TODO: there must be a more egonomic way
+                    debugln!("Merging hunks {next} and {peek}");
                     let mut merged = match next.merge(peek) {
                         Ok(hunk) => hunk,
                         Err(err) => {
@@ -146,19 +150,21 @@ impl FileDiff {
                         }
                     };
                     combined_iter.next();
+
                     while let Some(peek) = combined_iter.peek() {
-                        if merged.overlaps(peek) {
-                            merged = match merged.merge(peek) {
-                                Ok(hunk) => hunk,
-                                Err(err) => {
-                                    return Some(Err(err));
-                                }
-                            };
-                            combined_iter.next();
-                        } else {
+                        if !merged.overlaps(peek) {
                             return Some(Ok(merged));
                         }
+                        merged = match merged.merge(peek) {
+                            Ok(hunk) => hunk,
+                            Err(err) => {
+                                return Some(Err(err));
+                            }
+                        };
+                        combined_iter.next();
                     }
+
+                    return Some(Ok(merged));
                 }
                 None
             });
