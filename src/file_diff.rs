@@ -3,7 +3,7 @@ use std::slice::Iter;
 use crate::error::{MergeError, ParseError};
 use crate::header::Header;
 use crate::hunk::Hunk;
-use crate::macros::{debugln, merge_err};
+use crate::macros::{debugln, merge_err, parse_err};
 use core::cmp::Ordering;
 
 #[derive(Debug, Clone)]
@@ -48,23 +48,25 @@ impl FileDiff {
         let mut view = &lines[_num_lines..];
         let mut _hunks: Vec<Hunk> = Vec::new();
 
-        loop {
-            let hunk = Hunk::parse(view)?;
+        while let Some((num_consumed, hunk)) = Hunk::parse(view)? {
             debugln!("Parsed hunk {hunk}");
-
-            let hunk_lines = hunk.lines().len();
-            _num_lines += hunk_lines;
-
-            view = &view[hunk_lines..];
+            _num_lines += num_consumed;
+            view = &view[num_consumed..];
             _hunks.push(hunk);
-
-            let predicate = |s: &&str| s.starts_with("Index: ");
-            if view.get(0).map_or(true, predicate) {
-                break;
-            }
         }
 
-        // TODO: check that hunks do not overlap
+        for (i, lhs) in _hunks.iter().enumerate() {
+            for rhs in _hunks.iter().skip(i + 1) {
+                if lhs.overlaps(rhs) {
+                    return Err(parse_err!(
+                        "Could not parse file {}: hunks {} and {} overlap",
+                        _header.file_name(),
+                        lhs,
+                        rhs
+                    ));
+                }
+            }
+        }
 
         Ok(FileDiff {
             _header,

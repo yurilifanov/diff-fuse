@@ -93,22 +93,49 @@ impl Hunk {
         min(lhs_mmin, lhs_pmin).cmp(min(&rhs_mmin, &rhs_pmin))
     }
 
-    pub fn parse(lines: &[&str]) -> Result<Hunk, ParseError> {
-        let first = lines
-            .get(0)
-            .ok_or(parse_err!("Hunk: Could not fetch first line"))?;
+    pub fn parse(lines: &[&str]) -> Result<Option<(usize, Hunk)>, ParseError> {
+        let found = lines
+            .iter()
+            .enumerate()
+            .find(|(_, s)| !["\n", "\r\n"].contains(s));
 
-        let _header: [usize; 4] = Hunk::parse_header(&first)?;
+        if !found.map_or(false, |(_, s)| s.starts_with("@@")) {
+            return Ok(None);
+        }
 
-        let mut _lines: Vec<String> = vec![first.to_string()];
+        let (index, line) = found.unwrap();
+        let _header: [usize; 4] = Hunk::parse_header(&line)?;
+
+        let mut _lines: Vec<String> = vec![line.to_string()];
+        let mut counts: (usize, usize) = (0, 0);
         for line in lines.iter().skip(1) {
-            if !line.starts_with(['+', '-', ' ']) {
-                break;
+            match line.chars().nth(0).unwrap_or('!') {
+                '-' => {
+                    counts.0 += 1;
+                }
+                '+' => {
+                    counts.1 += 1;
+                }
+                ' ' => {
+                    counts.0 += 1;
+                    counts.1 += 1;
+                }
+                _ => {
+                    break;
+                }
             }
             _lines.push(line.to_string());
         }
 
-        Ok(Hunk { _lines, _header })
+        if counts.0 != _header[1] || counts.1 != _header[3] {
+            return Err(parse_err!(
+                "Could not parse hunk: line count = {:?}, header = {:?}",
+                counts,
+                _header
+            ));
+        }
+
+        Ok(Some((index + _lines.len(), Hunk { _lines, _header })))
     }
 
     pub fn lines(&self) -> &Vec<String> {
@@ -202,8 +229,12 @@ mod test_merge {
         .lines()
         .collect::<Vec<&str>>();
 
-        let first = Hunk::parse(&left[..]).unwrap();
-        let second = Hunk::parse(&right[..]).unwrap();
+        let Some((_, first)) = Hunk::parse(&left[..]).unwrap() else {
+            todo!()
+        };
+        let Some((_, second)) = Hunk::parse(&right[..]).unwrap() else {
+            todo!()
+        };
 
         match first.merge(&second) {
             Ok(merged) => {
