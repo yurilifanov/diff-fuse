@@ -1,6 +1,6 @@
 all: build svn
 
-UNDERLINE := '==================================================================='
+UNDERLINE := ===================================================================
 
 TARGETS := generate-svn/merge/success/1 generate-svn/merge/success/2
 
@@ -32,17 +32,17 @@ generate-svn/merge/success/3: generate-%:
 	git diff HEAD~10 HEAD~5 --no-prefix --ignore-space-at-eol | \
 		sed -e "s/^diff --git [^[:space:]]*/Index:/" \
 			-e "s/^index.*/$(UNDERLINE)/" \
-			-e "s/^@@\(.*\)@@.*/@@\1@@\n/" \
+			-e "s/^@@\(.*\)@@.*/@@\1@@/" \
 			> "$*"/left.diff
+
+	git diff HEAD~5 HEAD --no-prefix --ignore-space-at-eol | \
+		sed -e "s/^diff --git [^[:space:]]*/Index:/" \
+			-e "s/^index.*/$(UNDERLINE)/" \
+			-e "s/^@@\(.*\)@@.*/@@\1@@/" \
+			> "$*"/right.diff
 
 	git diff HEAD~10 HEAD --no-prefix --ignore-space-at-eol | \
 		sed -e "s/^diff --git [^[:space:]]*/Index:/" \
 			-e "s/^index.*/$(UNDERLINE)/" \
-			-e "s/^@@\(.*\)@@.*/@@\1@@\n/" \
-			> "$*"/right.diff
-
-	git diff HEAD~10 --no-prefix --ignore-space-at-eol | \
-		sed -e "s/^diff --git [^[:space:]]*/Index:/" \
-			-e "s/^index.*/$(UNDERLINE)/" \
-			-e "s/^@@\(.*\)@@.*/@@\1@@\n/" \
+			-e "s/^@@\(.*\)@@.*/@@\1@@/" \
 			> "$*"/expected.diff

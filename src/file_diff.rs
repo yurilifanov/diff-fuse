@@ -1,3 +1,5 @@
+mod flagged_hunk;
+
 use std::slice::Iter;
 
 use crate::error::{MergeError, ParseError};
@@ -5,6 +7,7 @@ use crate::header::Header;
 use crate::hunk::Hunk;
 use crate::macros::{debugln, merge_err, parse_err};
 use core::cmp::Ordering;
+use flagged_hunk::{FlaggedHunk, HunkAdapter};
 
 #[derive(Debug, Clone)]
 pub struct FileDiff {
@@ -118,17 +121,19 @@ impl FileDiff {
         let mut lhs = self._hunks.iter().peekable();
         let mut rhs = other._hunks.iter().peekable();
 
+        type Flagged<'a> = FlaggedHunk<'a>;
+
         // lhs or rhs hunks in correct order
         let mut combined_iter =
-            std::iter::from_fn(move || -> Option<&Hunk> {
+            std::iter::from_fn(move || -> Option<Flagged> {
                 match (lhs.peek(), rhs.peek()) {
                     (None, None) => None,
-                    (None, Some(_)) => rhs.next(),
-                    (Some(_), None) => lhs.next(),
+                    (None, Some(_)) => rhs.next().map(Flagged::Right),
+                    (Some(_), None) => lhs.next().map(Flagged::Left),
                     (Some(lhunk), Some(rhunk)) => match lhunk.cmp(rhunk) {
-                        Ordering::Less => lhs.next(),
-                        Ordering::Greater => rhs.next(),
-                        Ordering::Equal => lhs.next(),
+                        Ordering::Less => lhs.next().map(Flagged::Left),
+                        Ordering::Greater => rhs.next().map(Flagged::Right),
+                        Ordering::Equal => lhs.next().map(Flagged::Left),
                     },
                 }
             })
@@ -140,7 +145,7 @@ impl FileDiff {
                 let next = combined_iter.next()?;
                 if let Some(peek) = combined_iter.peek() {
                     if !next.overlaps(peek) {
-                        return Some(Ok(next.clone()));
+                        return Some(Ok(next.hunk().clone()));
                     }
 
                     // TODO: there must be a more egonomic way
@@ -154,10 +159,10 @@ impl FileDiff {
                     combined_iter.next();
 
                     while let Some(peek) = combined_iter.peek() {
-                        if !merged.overlaps(peek) {
+                        if !peek.overlaps(&merged) {
                             return Some(Ok(merged));
                         }
-                        merged = match merged.merge(peek) {
+                        merged = match peek.merge(&merged) {
                             Ok(hunk) => hunk,
                             Err(err) => {
                                 return Some(Err(err));

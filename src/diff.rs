@@ -98,6 +98,7 @@ impl Diff {
                 _order.push(key.clone());
             }
         }
+        _order.sort();
         Ok(Diff { _order, _map })
     }
 }

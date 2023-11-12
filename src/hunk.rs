@@ -203,46 +203,80 @@ impl std::fmt::Display for Hunk {
 mod test_merge {
     use crate::hunk::Hunk;
 
+    fn test(left: &str, right: &str, expected: &str) {
+        let lhs = Hunk::parse(&left.lines().collect::<Vec<&str>>()[..]);
+        let rhs = Hunk::parse(&right.lines().collect::<Vec<&str>>()[..]);
+        match (&lhs, &rhs) {
+            (Ok(Some((_, lhunk))), Ok(Some((_, rhunk)))) => {
+                match lhunk.merge(&rhunk) {
+                    Ok(merged) => {
+                        let actual: Vec<_> =
+                            merged._lines.iter().map(|s| s.as_str()).collect();
+                        assert_eq!(
+                            actual,
+                            expected.lines().collect::<Vec<&str>>()
+                        );
+                    }
+                    Err(err) => panic!("Error: {:?}", err),
+                }
+            }
+            _ => panic!("Enexpected case: {:?}", (lhs, rhs)),
+        }
+    }
+
     #[test]
     fn case_1() {
-        let left = "\
+        test(
+            "\
 @@ -1 +1 @@
 -a
 +b
-"
-        .lines()
-        .collect::<Vec<&str>>();
-        let right = "\
+",
+            "\
 @@ -1 +1,2 @@
 -b
 +c
 +d
-"
-        .lines()
-        .collect::<Vec<&str>>();
-        let expected = "\
+",
+            "\
 @@ -1 +1,2 @@
 -a
 +c
 +d
-"
-        .lines()
-        .collect::<Vec<&str>>();
+",
+        );
+    }
 
-        let Some((_, first)) = Hunk::parse(&left[..]).unwrap() else {
-            todo!()
-        };
-        let Some((_, second)) = Hunk::parse(&right[..]).unwrap() else {
-            todo!()
-        };
-
-        match first.merge(&second) {
-            Ok(merged) => {
-                let actual: Vec<_> =
-                    merged._lines.iter().map(|s| s.as_str()).collect();
-                assert_eq!(actual, expected);
-            }
-            Err(err) => panic!("{:?}", err),
-        }
+    #[test]
+    fn case_2() {
+        test(
+            "\
+@@ -2,4 +2,5 @@
+ 3
+ 4
+ 5
++6
+ 7
+",
+            "\
+@@ -1,5 +1,6 @@
+ 1
++2
+ 3
+ 4
+ 5
+ 6
+",
+            "\
+@@ -1,5 +1,7 @@
+ 1
++2
+ 3
+ 4
+ 5
++6
+ 7
+",
+        );
     }
 }
