@@ -139,6 +139,9 @@ impl FileDiff {
             })
             .peekable();
 
+        // FIXME: hunk headers should be adjusted
+        // FIXME: chain left and right iterators, then merge the chained
+
         // merged or cloned hunks
         let merge_iter =
             std::iter::from_fn(move || -> Option<Result<Hunk, MergeError>> {
@@ -173,7 +176,7 @@ impl FileDiff {
 
                     return Some(Ok(merged));
                 }
-                None
+                Some(Ok(next.hunk().clone()))
             });
 
         let mut hunks: Vec<Hunk> = Vec::new();

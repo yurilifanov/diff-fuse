@@ -1,4 +1,6 @@
 mod info_iter;
+mod iter_info;
+mod merge;
 mod merge_iter;
 
 use crate::error::{MergeError, ParseError};
