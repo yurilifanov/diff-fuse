@@ -1,4 +1,4 @@
-mod flagged_hunk;
+// mod flagged_hunk;
 
 use std::slice::Iter;
 
@@ -7,7 +7,7 @@ use crate::header::Header;
 use crate::hunk::Hunk;
 use crate::macros::{debugln, merge_err, parse_err};
 use core::cmp::Ordering;
-use flagged_hunk::{FlaggedHunk, HunkAdapter};
+// use flagged_hunk::{FlaggedHunk, HunkAdapter};
 
 #[derive(Debug, Clone)]
 pub struct FileDiff {
@@ -93,7 +93,7 @@ impl FileDiff {
         }
     }
 
-    pub fn merge(&self, other: &FileDiff) -> Result<FileDiff, MergeError> {
+    pub fn merge(mut self, other: FileDiff) -> Result<FileDiff, MergeError> {
         // A file diff is an ordered set X[i], i >= 0 of non-overlapping hunks.
         // Consider two file diffs, X and Y.
         //
@@ -118,79 +118,81 @@ impl FileDiff {
         }
 
         debugln!("Merging {lhs_file}");
-        let mut lhs = self._hunks.iter().peekable();
-        let mut rhs = other._hunks.iter().peekable();
+        let mut lhs = self._hunks.into_iter().peekable();
+        let mut rhs = other._hunks.into_iter().peekable();
 
-        type Flagged<'a> = FlaggedHunk<'a>;
+        // type Flagged<'a> = FlaggedHunk<'a>;
 
-        // lhs or rhs hunks in correct order
-        let mut combined_iter =
-            std::iter::from_fn(move || -> Option<Flagged> {
-                match (lhs.peek(), rhs.peek()) {
-                    (None, None) => None,
-                    (None, Some(_)) => rhs.next().map(Flagged::Right),
-                    (Some(_), None) => lhs.next().map(Flagged::Left),
-                    (Some(lhunk), Some(rhunk)) => match lhunk.cmp(rhunk) {
-                        Ordering::Less => lhs.next().map(Flagged::Left),
-                        Ordering::Greater => rhs.next().map(Flagged::Right),
-                        Ordering::Equal => lhs.next().map(Flagged::Left),
-                    },
-                }
-            })
-            .peekable();
+        // // lhs or rhs hunks in correct order
+        // let mut combined_iter =
+        //     std::iter::from_fn(move || -> Option<Flagged> {
+        //         match (lhs.peek(), rhs.peek()) {
+        //             (None, None) => None,
+        //             (None, Some(_)) => rhs.next().map(Flagged::Right),
+        //             (Some(_), None) => lhs.next().map(Flagged::Left),
+        //             (Some(lhunk), Some(rhunk)) => match lhunk.cmp(rhunk) {
+        //                 Ordering::Less => lhs.next().map(Flagged::Left),
+        //                 Ordering::Greater => rhs.next().map(Flagged::Right),
+        //                 Ordering::Equal => lhs.next().map(Flagged::Left),
+        //             },
+        //         }
+        //     })
+        //     .peekable();
 
-        // FIXME: hunk headers should be adjusted
-        // FIXME: chain left and right iterators, then merge the chained
+        // // FIXME: hunk headers should be adjusted
+        // // FIXME: chain left and right iterators, then merge the chained
 
-        // merged or cloned hunks
-        let merge_iter =
-            std::iter::from_fn(move || -> Option<Result<Hunk, MergeError>> {
-                let next = combined_iter.next()?;
-                if let Some(peek) = combined_iter.peek() {
-                    if !next.overlaps(peek) {
-                        return Some(Ok(next.hunk().clone()));
-                    }
+        // // merged or cloned hunks
+        // let merge_iter =
+        //     std::iter::from_fn(move || -> Option<Result<Hunk, MergeError>> {
+        //         let next = combined_iter.next()?;
+        //         if let Some(peek) = combined_iter.peek() {
+        //             if !next.overlaps(peek) {
+        //                 return Some(Ok(next.hunk().clone()));
+        //             }
 
-                    // TODO: there must be a more egonomic way
-                    debugln!("Merging hunks {next} and {peek}");
-                    let mut merged = match next.merge(peek) {
-                        Ok(hunk) => hunk,
-                        Err(err) => {
-                            return Some(Err(err));
-                        }
-                    };
-                    combined_iter.next();
+        //             // TODO: there must be a more egonomic way
+        //             debugln!("Merging hunks {next} and {peek}");
+        //             let mut merged = match next.merge(peek) {
+        //                 Ok(hunk) => hunk,
+        //                 Err(err) => {
+        //                     return Some(Err(err));
+        //                 }
+        //             };
+        //             combined_iter.next();
 
-                    while let Some(peek) = combined_iter.peek() {
-                        if !peek.overlaps(&merged) {
-                            return Some(Ok(merged));
-                        }
-                        merged = match peek.merge(&merged) {
-                            Ok(hunk) => hunk,
-                            Err(err) => {
-                                return Some(Err(err));
-                            }
-                        };
-                        combined_iter.next();
-                    }
+        //             while let Some(peek) = combined_iter.peek() {
+        //                 if !peek.overlaps(&merged) {
+        //                     return Some(Ok(merged));
+        //                 }
+        //                 merged = match peek.merge(&merged) {
+        //                     Ok(hunk) => hunk,
+        //                     Err(err) => {
+        //                         return Some(Err(err));
+        //                     }
+        //                 };
+        //                 combined_iter.next();
+        //             }
 
-                    return Some(Ok(merged));
-                }
-                Some(Ok(next.hunk().clone()))
-            });
+        //             return Some(Ok(merged));
+        //         }
+        //         Some(Ok(next.hunk().clone()))
+        //     });
 
-        let mut hunks: Vec<Hunk> = Vec::new();
-        let mut _num_lines = self._header.lines().len();
-        for item in merge_iter {
-            let hunk = item?;
-            _num_lines += hunk.lines().len();
-            hunks.push(hunk);
-        }
+        // let mut hunks: Vec<Hunk> = Vec::new();
+        // let mut _num_lines = self._header.lines().len();
+        // for item in merge_iter {
+        //     let hunk = item?;
+        //     _num_lines += hunk.lines().len();
+        //     hunks.push(hunk);
+        // }
 
-        Ok(FileDiff {
-            _header: self._header.clone(),
-            _hunks: hunks,
-            _num_lines,
-        })
+        // Ok(FileDiff {
+        //     _header: self._header.clone(),
+        //     _hunks: hunks,
+        //     _num_lines,
+        // })
+
+        todo!()
     }
 }

@@ -134,10 +134,10 @@ fn merge_iter<T: Iterator<Item = String>, U: Iterator<Item = String>>(
     rheader: &[usize; 4],
     rlines: U,
 ) -> impl Iterator<Item = Result<MergeItem, MergeError>> {
-    let mut linfo = iter_info(lheader, llines, InfoType::Minus()).peekable();
-    let mut rinfo = iter_info(rheader, rlines, InfoType::Plus()).peekable();
+    let mut lhs = iter_info(lheader, llines, InfoType::Minus()).peekable();
+    let mut rhs = iter_info(rheader, rlines, InfoType::Plus()).peekable();
     std::iter::from_fn(move || -> Option<Result<MergeItem, MergeError>> {
-        send(&mut linfo, &mut rinfo)
+        send(&mut lhs, &mut rhs)
     })
 }
 

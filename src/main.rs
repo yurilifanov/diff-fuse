@@ -20,13 +20,12 @@ fn main() {
         return;
     }
 
-    let diff = paths.iter().skip(1).fold(
-        Diff::read(paths.get(0).unwrap()).unwrap(),
-        |diff, path| {
-            let next = Diff::read(path).unwrap();
-            diff.merge(&next).unwrap()
-        },
-    );
+    let mut path_iter = paths.into_iter();
+    let first_path = path_iter.next().unwrap();
+    let diff = path_iter
+        .fold(Diff::read(&first_path).unwrap(), |diff, path| {
+            diff.merge(Diff::read(&path).unwrap()).unwrap()
+        });
 
     for line in diff.line_iter() {
         println!("{line}");

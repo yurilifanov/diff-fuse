@@ -1,10 +1,11 @@
-mod info_iter;
+// mod info_iter;
 mod iter_info;
 mod merge;
-mod merge_iter;
+// mod merge_iter;
 
 use crate::error::{MergeError, ParseError};
-use crate::hunk::merge_iter::{process, MergeIter};
+// use crate::hunk::merge_iter::{process, MergeIter};
+use crate::hunk::merge::merge;
 use crate::macros::{merge_err, parse_err};
 use core::cmp::{min, Ordering};
 
@@ -95,6 +96,46 @@ impl Hunk {
         min(lhs_mmin, lhs_pmin).cmp(min(&rhs_mmin, &rhs_pmin))
     }
 
+    pub fn from_iter<T: Iterator<Item = String>>(
+        // TODO: rename to parse
+        mut lines: &mut T,
+    ) -> Result<Option<Hunk>, ParseError> {
+        let first_non_empty =
+            lines.find(|s| !["\n", "\r\n"].contains(&s.as_str()));
+        if let Some(line) = first_non_empty {
+            if !line.starts_with("@@") {
+                return Ok(None);
+            }
+
+            // parse header
+
+            let mut collected: Vec<String> = vec![line];
+            let mut counts: (usize, usize) = (0, 0);
+            for line in lines {
+                match line.chars().nth(0).unwrap_or('!') {
+                    '-' => {
+                        counts.0 += 1;
+                    }
+                    '+' => {
+                        counts.1 += 1;
+                    }
+                    ' ' => {
+                        counts.0 += 1;
+                        counts.1 += 1;
+                    }
+                    _ => {
+                        break;
+                    }
+                }
+                collected.push(line);
+            }
+
+            todo!()
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn parse(lines: &[&str]) -> Result<Option<(usize, Hunk)>, ParseError> {
         let found = lines
             .iter()
@@ -170,22 +211,28 @@ impl Hunk {
         false
     }
 
-    pub fn merge<'a>(&'a self, other: &'a Hunk) -> Result<Hunk, MergeError> {
-        if !self.overlaps(other) {
+    pub fn merge<'a>(mut self, other: Hunk) -> Result<Hunk, MergeError> {
+        if !self.overlaps(&other) {
             return Err(merge_err!(
                 "Expected hunks {:?} and {:?} to overlap, but they do not",
                 self._header,
                 other._header
             ));
         }
-        let as_str = |s: &'a String| -> &'a str { s.as_str() };
-        let (_header, mut _lines) = process(MergeIter::new(
-            (self._header, other._header),
-            (
-                self._lines[1..].iter().map(as_str),
-                other._lines[1..].iter().map(as_str),
-            ),
-        ))?;
+        // let as_str = |s: &'a String| -> &'a str { s.as_str() };
+        let (_header, mut _lines) = merge(
+            &self._header,
+            self._lines.into_iter().skip(1),
+            &other._header,
+            other._lines.into_iter().skip(1),
+        )?;
+        // let (_header, mut _lines) = process(MergeIter::new(
+        //     (self._header, other._header),
+        //     (
+        //         self._lines[1..].iter().map(as_str),
+        //         other._lines[1..].iter().map(as_str),
+        //     ),
+        // ))?;
         _lines.insert(0, Self::serialize_header(&_header));
         Ok(Hunk { _header, _lines })
     }
@@ -208,9 +255,9 @@ mod test_merge {
     fn test(left: &str, right: &str, expected: &str) {
         let lhs = Hunk::parse(&left.lines().collect::<Vec<&str>>()[..]);
         let rhs = Hunk::parse(&right.lines().collect::<Vec<&str>>()[..]);
-        match (&lhs, &rhs) {
+        match (lhs, rhs) {
             (Ok(Some((_, lhunk))), Ok(Some((_, rhunk)))) => {
-                match lhunk.merge(&rhunk) {
+                match lhunk.merge(rhunk) {
                     Ok(merged) => {
                         let actual: Vec<_> =
                             merged._lines.iter().map(|s| s.as_str()).collect();
@@ -222,7 +269,7 @@ mod test_merge {
                     Err(err) => panic!("Error: {:?}", err),
                 }
             }
-            _ => panic!("Enexpected case: {:?}", (lhs, rhs)),
+            (left, right) => panic!("Unexpected case: {:?}", (left, right)),
         }
     }
 

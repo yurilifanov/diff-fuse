@@ -81,22 +81,20 @@ impl Diff {
         }
     }
 
-    pub fn merge(&self, other: &Diff) -> Result<Diff, MergeError> {
+    pub fn merge(mut self, mut other: Diff) -> Result<Diff, MergeError> {
         let mut _order: Vec<String> = Vec::new();
         let mut _map: HashMap<String, FileDiff> = HashMap::new();
-        for (key, val) in other._map.iter() {
-            if let Some(diff) = self._map.get(key) {
+        for (key, val) in other._map.drain() {
+            if let Some(mut diff) = self._map.remove(&key) {
                 _map.insert(key.clone(), diff.merge(val)?);
             } else {
-                _map.insert(key.clone(), val.clone());
+                _map.insert(key.clone(), val);
             }
-            _order.push(key.clone());
+            _order.push(key);
         }
-        for (key, val) in self._map.iter() {
-            if !_map.contains_key(key) {
-                _map.insert(key.clone(), val.clone());
-                _order.push(key.clone());
-            }
+        for (key, val) in self._map.drain() {
+            _map.insert(key.clone(), val);
+            _order.push(key);
         }
         _order.sort();
         Ok(Diff { _order, _map })
