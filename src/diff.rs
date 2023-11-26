@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
-use std::iter::zip;
+// use std::iter::zip;
 use std::path::PathBuf;
 use std::slice::Iter;
 use std::str::FromStr;
@@ -49,13 +49,15 @@ impl Diff {
         Ok(Self::from(data.parse()?))
     }
 
-    pub fn parse(lines: &[&str]) -> Result<Diff, ParseError> {
-        let mut view = &lines[..];
+    pub fn from_lines<'a, T: Iterator<Item = &'a str>>(
+        lines: &mut T,
+    ) -> Result<Diff, ParseError> {
+        let mut peekable = lines.peekable();
         let mut _order: Vec<String> = Vec::new();
         let mut _map: HashMap<String, FileDiff> = HashMap::new();
 
-        while !view.is_empty() {
-            let file_diff = FileDiff::parse(view)?;
+        while peekable.peek().is_some() {
+            let file_diff = FileDiff::from_lines(&mut peekable)?;
             let file_name = file_diff.header().file_name().to_string();
 
             if _map.contains_key(&file_name) {
@@ -65,7 +67,6 @@ impl Diff {
                 ));
             }
 
-            view = &view[file_diff.num_lines()..];
             _order.push(file_name.clone());
             _map.insert(file_name, file_diff);
         }
@@ -85,7 +86,7 @@ impl Diff {
         let mut _order: Vec<String> = Vec::new();
         let mut _map: HashMap<String, FileDiff> = HashMap::new();
         for (key, val) in other._map.drain() {
-            if let Some(mut diff) = self._map.remove(&key) {
+            if let Some(diff) = self._map.remove(&key) {
                 _map.insert(key.clone(), diff.merge(val)?);
             } else {
                 _map.insert(key.clone(), val);
@@ -101,32 +102,10 @@ impl Diff {
     }
 }
 
-fn get_line_separator(data: &str) -> &str {
-    if data.find("\r\n").is_none() {
-        debugln!("LF separator detected");
-        return "\n";
-    }
-
-    debugln!("CRLF separator detected");
-    let last = data.len() - 1;
-    let zipped = zip(data[..last].chars(), data[1..].chars());
-    for (prev, curr) in zipped {
-        if curr == '\n' && prev != '\r' {
-            panic!("Inconsistent line separator");
-        }
-    }
-    "\r\n"
-}
-
-fn get_lines(data: &str) -> Vec<&str> {
-    let sep = get_line_separator(data);
-    data.split_terminator(sep).collect()
-}
-
 impl FromStr for Diff {
     type Err = ParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Diff::parse(&get_lines(s)[..])
+        Diff::from_lines(&mut s.lines())
     }
 }
 

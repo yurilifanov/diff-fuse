@@ -1,12 +1,12 @@
 // mod flagged_hunk;
 
-use std::slice::Iter;
-
 use crate::error::{MergeError, ParseError};
 use crate::header::Header;
 use crate::hunk::Hunk;
 use crate::macros::{debugln, merge_err, parse_err};
-use core::cmp::Ordering;
+// use core::cmp::Ordering;
+use std::iter::Peekable;
+use std::slice::Iter;
 // use flagged_hunk::{FlaggedHunk, HunkAdapter};
 
 #[derive(Debug, Clone)]
@@ -45,16 +45,22 @@ impl<'a> Iterator for LineIter<'a> {
 }
 
 impl FileDiff {
-    pub fn parse(lines: &[&str]) -> Result<FileDiff, ParseError> {
-        let _header = Header::parse(lines)?;
+    pub fn from_lines<'a, T: Iterator<Item = &'a str>>(
+        mut lines: &mut Peekable<T>,
+    ) -> Result<FileDiff, ParseError> {
+        let _header = Header::from_lines(lines)?;
         let mut _num_lines = _header.lines().len();
-        let mut view = &lines[_num_lines..];
         let mut _hunks: Vec<Hunk> = Vec::new();
-
-        while let Some((num_consumed, hunk)) = Hunk::parse(view)? {
+        while let Some(line) = lines.peek() {
+            if line.chars().all(char::is_whitespace) {
+                lines.next();
+                continue;
+            } else if !line.starts_with("@@") {
+                break;
+            }
+            let hunk = Hunk::from_lines(&mut lines)?;
             debugln!("Parsed hunk {hunk}");
-            _num_lines += num_consumed;
-            view = &view[num_consumed..];
+            _num_lines += hunk.lines().len();
             _hunks.push(hunk);
         }
 
@@ -118,8 +124,8 @@ impl FileDiff {
         }
 
         debugln!("Merging {lhs_file}");
-        let mut lhs = self._hunks.into_iter().peekable();
-        let mut rhs = other._hunks.into_iter().peekable();
+        // let mut lhs = self._hunks.into_iter().peekable();
+        // let mut rhs = other._hunks.into_iter().peekable();
 
         // type Flagged<'a> = FlaggedHunk<'a>;
 
@@ -194,5 +200,65 @@ impl FileDiff {
         // })
 
         todo!()
+    }
+}
+
+impl ToString for FileDiff {
+    fn to_string(&self) -> String {
+        let mut string = String::new();
+        for line in self.line_iter() {
+            string += line;
+            string += "\n";
+        }
+        string
+    }
+}
+
+#[cfg(test)]
+mod test_parse {
+    use crate::file_diff::FileDiff;
+
+    fn test(expected: &str) {
+        match FileDiff::from_lines(&mut expected.lines().peekable()) {
+            Ok(result) => {
+                assert_eq!(expected, result.to_string().as_str());
+            }
+            Err(err) => {
+                panic!("{err:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn case_1() {
+        test(
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1 +1 @@
+-a
++b
+",
+        );
+    }
+
+    #[test]
+    fn case_2() {
+        test(
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1 +1 @@
+-a
++b
+@@ -3 +3 @@
+-a
++b
+",
+        );
     }
 }

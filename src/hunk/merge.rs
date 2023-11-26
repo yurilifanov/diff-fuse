@@ -137,13 +137,13 @@ fn merge_iter<T: Iterator<Item = String>, U: Iterator<Item = String>>(
     let mut lhs = iter_info(lheader, llines, InfoType::Minus()).peekable();
     let mut rhs = iter_info(rheader, rlines, InfoType::Plus()).peekable();
     std::iter::from_fn(move || -> Option<Result<MergeItem, MergeError>> {
-        send(&mut lhs, &mut rhs)
+        next(&mut lhs, &mut rhs)
     })
 }
 
-fn send<T: Iterator<Item = Info>, U: Iterator<Item = Info>>(
-    mut lhs: &mut Peekable<T>,
-    mut rhs: &mut Peekable<U>,
+fn next<T: Iterator<Item = Info>, U: Iterator<Item = Info>>(
+    lhs: &mut Peekable<T>,
+    rhs: &mut Peekable<U>,
 ) -> Option<Result<MergeItem, MergeError>> {
     match [lhs.peek(), rhs.peek()] {
         [None, None] => None,
@@ -212,14 +212,14 @@ fn send<T: Iterator<Item = Info>, U: Iterator<Item = Info>>(
 }
 
 fn take<T: Iterator<Item = Info>>(
-    mut iter: &mut Peekable<T>,
+    iter: &mut Peekable<T>,
 ) -> Option<Result<MergeItem, MergeError>> {
     Some(Ok(MergeItem::Single(iter.next()?.line)))
 }
 
 fn skip<T: Iterator<Item = Info>, U: Iterator<Item = Info>>(
-    mut lhs: &mut Peekable<T>,
-    mut rhs: &mut Peekable<U>,
+    lhs: &mut Peekable<T>,
+    rhs: &mut Peekable<U>,
 ) -> Option<Result<MergeItem, MergeError>> {
     let lline = lhs.next()?.line;
     let rline = rhs.next()?.line;
@@ -233,8 +233,8 @@ fn skip<T: Iterator<Item = Info>, U: Iterator<Item = Info>>(
 }
 
 fn skip_take<T: Iterator<Item = Info>, U: Iterator<Item = Info>>(
-    mut lhs: &mut Peekable<T>,
-    mut rhs: &mut Peekable<U>,
+    lhs: &mut Peekable<T>,
+    rhs: &mut Peekable<U>,
 ) -> Option<Result<MergeItem, MergeError>> {
     let lline = lhs.next()?.line;
     let rline = rhs.next()?.line;
