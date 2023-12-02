@@ -137,53 +137,54 @@ fn merge_iter<T: Iterator<Item = String>, U: Iterator<Item = String>>(
     let mut liter = iter_info(lheader, llines, InfoType::Minus()).peekable();
     let mut riter = iter_info(rheader, rlines, InfoType::Plus()).peekable();
     std::iter::from_fn(move || -> Option<Result<MergeItem, MergeError>> {
-        // next(&mut liter, &mut riter)
         match [liter.peek(), riter.peek()] {
             [None, None] => None,
             [None, Some(_)] => take(&mut riter),
             [Some(_), None] => take(&mut liter),
-
-            // what's on the right and left should be determined based on
-            // info precedence
-            [Some(linfo), Some(rinfo)] => {
-                let index = (
-                    linfo.prefix(),
-                    rinfo.prefix(),
-                    linfo.rank.cmp(&rinfo.rank),
-                );
-                match linfo.cmp(&rinfo) {
-                    Ordering::Less => next(index, &mut liter, &mut riter),
-                    Ordering::Greater => next(index, &mut riter, &mut liter),
-
-                    // FIXME: more elaborate error
-                    _ => Some(Err(merge_err!("Merge conflict detected"))),
+            [Some(linfo), Some(rinfo)] => match linfo.cmp(&rinfo) {
+                Ordering::Less => match linfo.rank.cmp(&rinfo.rank) {
+                    Ordering::Less => take(&mut liter),
+                    Ordering::Greater => take(&mut riter),
+                    _ => {
+                        let index = [linfo.prefix(), rinfo.prefix()];
+                        next(index, &mut liter, &mut riter)
+                    }
+                },
+                Ordering::Greater => match rinfo.rank.cmp(&linfo.rank) {
+                    Ordering::Less => take(&mut riter),
+                    Ordering::Greater => take(&mut liter),
+                    _ => {
+                        let index = [rinfo.prefix(), linfo.prefix()];
+                        next(index, &mut riter, &mut liter)
+                    }
+                },
+                _ => {
+                    let lline = liter.next()?.line;
+                    let rline = riter.next()?.line;
+                    Some(Err(merge_err!(
+                        "Conflict between lines '{}' and '{}'",
+                        lline,
+                        rline
+                    )))
                 }
-            }
+            },
         }
     })
 }
 
 fn next<T: Iterator<Item = Info>, U: Iterator<Item = Info>>(
-    index: (char, char, Ordering),
+    index: [char; 2],
     liter: &mut T,
     riter: &mut U,
 ) -> Option<Result<MergeItem, MergeError>> {
     match index {
-        ('+', '+', Ordering::Less) => take(liter),
-        ('+', '+', _) => take(riter),
+        [' ', ' '] => skip_take(liter, riter),
+        ['+', ' '] => skip_take(riter, liter),
+        ['-', ' '] => take(liter),
 
-        (' ', '+', Ordering::Less) => take(liter),
-        (' ', '+', _) => take(riter),
-
-        ('-', ' ', Ordering::Greater) => take(riter),
-        ('-', ' ', _) => take(liter),
-
-        ('-', '-', Ordering::Greater) => take(riter),
-        ('-', '-', _) => take(liter),
-
-        ('-', '+', Ordering::Less) => take(liter),
-        ('-', '+', Ordering::Greater) => take(riter),
-        ('-', '+', _) => {
+        [' ', '+'] => take(riter),
+        ['+', '+'] => take(riter),
+        ['-', '+'] => {
             let lline = liter.next()?.line;
             let mut rline = riter.next()?.line;
             if lline[1..] == rline[1..] {
@@ -194,21 +195,9 @@ fn next<T: Iterator<Item = Info>, U: Iterator<Item = Info>>(
             }
         }
 
-        ('+', '-', Ordering::Less) => take(liter),
-        ('+', '-', Ordering::Greater) => take(riter),
-        ('+', '-', _) => skip(liter, riter),
-
-        ('+', ' ', Ordering::Less) => take(liter),
-        ('+', ' ', Ordering::Greater) => take(riter),
-        ('+', ' ', _) => skip_take(riter, liter),
-
-        (' ', ' ', Ordering::Less) => take(liter),
-        (' ', ' ', Ordering::Greater) => take(riter),
-        (' ', ' ', _) => skip_take(liter, riter),
-
-        (' ', '-', Ordering::Less) => take(liter),
-        (' ', '-', Ordering::Greater) => take(liter),
-        (' ', '-', _) => skip_take(liter, riter),
+        [' ', '-'] => skip_take(liter, riter),
+        ['+', '-'] => skip(liter, riter),
+        ['-', '-'] => take(liter),
 
         _ => {
             let lline = liter.next()?.line;
