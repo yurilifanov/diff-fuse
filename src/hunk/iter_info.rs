@@ -1,3 +1,5 @@
+use core::cmp::Ordering;
+
 #[derive(Debug, PartialEq)]
 pub struct Info {
     pub line: String,
@@ -7,6 +9,11 @@ pub struct Info {
 impl Info {
     pub fn prefix(&self) -> char {
         self.line.chars().nth(0).unwrap_or(' ')
+    }
+
+    pub fn cmp(&self, other: &Info) -> Ordering {
+        // FIXME
+        Ordering::Less
     }
 }
 

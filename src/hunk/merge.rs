@@ -134,92 +134,101 @@ fn merge_iter<T: Iterator<Item = String>, U: Iterator<Item = String>>(
     rheader: &[usize; 4],
     rlines: U,
 ) -> impl Iterator<Item = Result<MergeItem, MergeError>> {
-    let mut lhs = iter_info(lheader, llines, InfoType::Minus()).peekable();
-    let mut rhs = iter_info(rheader, rlines, InfoType::Plus()).peekable();
+    let mut liter = iter_info(lheader, llines, InfoType::Minus()).peekable();
+    let mut riter = iter_info(rheader, rlines, InfoType::Plus()).peekable();
     std::iter::from_fn(move || -> Option<Result<MergeItem, MergeError>> {
-        next(&mut lhs, &mut rhs)
+        // next(&mut liter, &mut riter)
+        match [liter.peek(), riter.peek()] {
+            [None, None] => None,
+            [None, Some(_)] => take(&mut riter),
+            [Some(_), None] => take(&mut liter),
+
+            // what's on the right and left should be determined based on
+            // info precedence
+            [Some(linfo), Some(rinfo)] => {
+                let index = (
+                    linfo.prefix(),
+                    rinfo.prefix(),
+                    linfo.rank.cmp(&rinfo.rank),
+                );
+                match linfo.cmp(&rinfo) {
+                    Ordering::Less => next(index, &mut liter, &mut riter),
+                    Ordering::Greater => next(index, &mut riter, &mut liter),
+
+                    // FIXME: more elaborate error
+                    _ => Some(Err(merge_err!("Merge conflict detected"))),
+                }
+            }
+        }
     })
 }
 
 fn next<T: Iterator<Item = Info>, U: Iterator<Item = Info>>(
-    lhs: &mut Peekable<T>,
-    rhs: &mut Peekable<U>,
+    index: (char, char, Ordering),
+    liter: &mut T,
+    riter: &mut U,
 ) -> Option<Result<MergeItem, MergeError>> {
-    match [lhs.peek(), rhs.peek()] {
-        [None, None] => None,
-        [None, Some(_)] => take(rhs),
-        [Some(_), None] => take(lhs),
-        [Some(li), Some(ri)] => match [li.prefix(), ri.prefix()] {
-            ['+', '+'] => match li.rank.cmp(&ri.rank) {
-                Ordering::Less => take(lhs),
-                _ => take(rhs),
-            },
-            [' ', '+'] => match li.rank.cmp(&ri.rank) {
-                Ordering::Less => take(lhs),
-                _ => take(rhs),
-            },
-            ['-', ' '] => match li.rank.cmp(&ri.rank) {
-                Ordering::Greater => take(rhs),
-                _ => take(lhs),
-            },
-            ['-', '-'] => match li.rank.cmp(&ri.rank) {
-                Ordering::Greater => take(rhs),
-                _ => take(lhs),
-            },
-            ['-', '+'] => match li.rank.cmp(&ri.rank) {
-                Ordering::Less => take(lhs),
-                Ordering::Greater => take(rhs),
-                _ => {
-                    let lline = lhs.next()?.line;
-                    let mut rline = rhs.next()?.line;
-                    if lline[1..] == rline[1..] {
-                        rline.replace_range(0..1, " ");
-                        Some(Ok(MergeItem::Single(rline)))
-                    } else {
-                        Some(Ok(MergeItem::Pair((lline, rline))))
-                    }
-                }
-            },
-            ['+', '-'] => match li.rank.cmp(&ri.rank) {
-                Ordering::Less => take(lhs),
-                Ordering::Greater => take(rhs),
-                _ => skip(lhs, rhs),
-            },
-            ['+', ' '] => match li.rank.cmp(&ri.rank) {
-                Ordering::Less => take(lhs),
-                Ordering::Greater => take(rhs),
-                _ => skip_take(rhs, lhs),
-            },
-            [' ', ' '] => match li.rank.cmp(&ri.rank) {
-                Ordering::Less => take(lhs),
-                Ordering::Greater => take(rhs),
-                _ => skip_take(lhs, rhs),
-            },
-            [' ', '-'] => match li.rank.cmp(&ri.rank) {
-                Ordering::Less => take(lhs),
-                Ordering::Greater => take(rhs),
-                _ => skip_take(lhs, rhs),
-            },
-            _ => {
-                let lline = lhs.next()?.line;
-                let rline = rhs.next()?.line;
-                Some(Err(merge_err!(
-                    "Unexpected prefixes on lines '{lline}' and '{rline}'"
-                )))
+    match index {
+        ('+', '+', Ordering::Less) => take(liter),
+        ('+', '+', _) => take(riter),
+
+        (' ', '+', Ordering::Less) => take(liter),
+        (' ', '+', _) => take(riter),
+
+        ('-', ' ', Ordering::Greater) => take(riter),
+        ('-', ' ', _) => take(liter),
+
+        ('-', '-', Ordering::Greater) => take(riter),
+        ('-', '-', _) => take(liter),
+
+        ('-', '+', Ordering::Less) => take(liter),
+        ('-', '+', Ordering::Greater) => take(riter),
+        ('-', '+', _) => {
+            let lline = liter.next()?.line;
+            let mut rline = riter.next()?.line;
+            if lline[1..] == rline[1..] {
+                rline.replace_range(0..1, " ");
+                Some(Ok(MergeItem::Single(rline)))
+            } else {
+                Some(Ok(MergeItem::Pair((lline, rline))))
             }
-        },
+        }
+
+        ('+', '-', Ordering::Less) => take(liter),
+        ('+', '-', Ordering::Greater) => take(riter),
+        ('+', '-', _) => skip(liter, riter),
+
+        ('+', ' ', Ordering::Less) => take(liter),
+        ('+', ' ', Ordering::Greater) => take(riter),
+        ('+', ' ', _) => skip_take(riter, liter),
+
+        (' ', ' ', Ordering::Less) => take(liter),
+        (' ', ' ', Ordering::Greater) => take(riter),
+        (' ', ' ', _) => skip_take(liter, riter),
+
+        (' ', '-', Ordering::Less) => take(liter),
+        (' ', '-', Ordering::Greater) => take(liter),
+        (' ', '-', _) => skip_take(liter, riter),
+
+        _ => {
+            let lline = liter.next()?.line;
+            let rline = riter.next()?.line;
+            Some(Err(merge_err!(
+                "Unexpected prefixes on lines '{lline}' and '{rline}'"
+            )))
+        }
     }
 }
 
 fn take<T: Iterator<Item = Info>>(
-    iter: &mut Peekable<T>,
+    iter: &mut T,
 ) -> Option<Result<MergeItem, MergeError>> {
     Some(Ok(MergeItem::Single(iter.next()?.line)))
 }
 
 fn skip<T: Iterator<Item = Info>, U: Iterator<Item = Info>>(
-    lhs: &mut Peekable<T>,
-    rhs: &mut Peekable<U>,
+    lhs: &mut T,
+    rhs: &mut U,
 ) -> Option<Result<MergeItem, MergeError>> {
     let lline = lhs.next()?.line;
     let rline = rhs.next()?.line;
@@ -233,8 +242,8 @@ fn skip<T: Iterator<Item = Info>, U: Iterator<Item = Info>>(
 }
 
 fn skip_take<T: Iterator<Item = Info>, U: Iterator<Item = Info>>(
-    lhs: &mut Peekable<T>,
-    rhs: &mut Peekable<U>,
+    lhs: &mut T,
+    rhs: &mut U,
 ) -> Option<Result<MergeItem, MergeError>> {
     let lline = lhs.next()?.line;
     let rline = rhs.next()?.line;
