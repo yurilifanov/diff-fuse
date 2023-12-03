@@ -6,3 +6,4 @@ mod header;
 mod hunk;
 mod macros;
 mod merge;
+mod info;

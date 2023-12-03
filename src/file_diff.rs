@@ -1,5 +1,3 @@
-// mod flagged_hunk;
-
 use crate::error::{MergeError, ParseError};
 use crate::hand::Hand;
 use crate::header::Header;
@@ -9,7 +7,6 @@ use crate::macros::{debugln, merge_err, parse_err};
 use core::cmp::Ordering;
 use std::iter::Peekable;
 use std::slice::Iter;
-// use flagged_hunk::{FlaggedHunk, HunkAdapter};
 
 #[derive(Debug, Clone)]
 pub struct FileDiff {
@@ -397,6 +394,53 @@ Index: test.txt
 +a
 @@ -2 +2 @@
 -ii
++b
+@@ -3 +3 @@
+-iii
++c
+",
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1,3 +1,3 @@
+-1
+-2
+-3
++a
++b
++c
+",
+        );
+    }
+
+    #[test]
+    fn case_4() {
+        test(
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1 +1 @@
+-1
++i
+@@ -2,2 +2,2 @@
+-2
+-3
++ii
++iii
+",
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1,2 +1,2 @@
+-i
+-ii
++a
 +b
 @@ -3 +3 @@
 -iii

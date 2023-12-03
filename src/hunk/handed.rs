@@ -1,6 +1,7 @@
 use crate::error::MergeError;
 use crate::hand::Hand;
 use crate::hunk::{header, Hunk};
+use crate::info::Info;
 use crate::macros::merge_err;
 use crate::merge::Merge;
 use std::iter::repeat;
@@ -11,11 +12,8 @@ pub struct HandedHunk {
 }
 
 impl HandedHunk {
-    fn into_data(
-        mut self,
-    ) -> ([usize; 4], impl Iterator<Item = (Hand, String)>) {
-        let (header, iter) = self.hunk.into_data();
-        (header, repeat(self.hand).zip(iter))
+    fn into_info(mut self) -> ([usize; 4], impl Iterator<Item = Info>) {
+        self.hunk.into_info(self.hand)
     }
 }
 
@@ -56,8 +54,8 @@ impl Mergeable<HandedHunk> for HandedHunk {
         if self.hand == other.hand {
             return Err(merge_err!("Cannot merge same-handed hunks"));
         }
-        let (lheader, liter) = self.into_data();
-        let (rheader, riter) = other.into_data();
+        let (lheader, liter) = self.into_info();
+        let (rheader, riter) = other.into_info();
         Merge::new(&lheader, liter, &rheader, riter)
     }
 }
@@ -72,8 +70,8 @@ impl Mergeable<Merge> for HandedHunk {
     }
 
     fn merge(mut self, other: Merge) -> Result<Merge, MergeError> {
-        let (lheader, liter) = self.into_data();
-        let (rheader, riter) = other.into_data();
+        let (lheader, liter) = self.into_info();
+        let (rheader, riter) = other.into_info();
         Merge::new(&lheader, liter, &rheader, riter)
     }
 }

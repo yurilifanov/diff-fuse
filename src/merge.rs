@@ -1,9 +1,9 @@
-mod iter_info;
 mod merge_fn;
 
 use crate::error::MergeError;
 use crate::hand::Hand;
 use crate::hunk::{header, Hunk};
+use crate::info::{iter_left_info, iter_right_info, Info};
 use crate::macros::merge_err;
 
 #[derive(Debug)]
@@ -13,17 +13,14 @@ pub struct Merge {
 }
 
 impl Merge {
-    pub fn new<
-        T: Iterator<Item = (Hand, String)>,
-        U: Iterator<Item = (Hand, String)>,
-    >(
+    pub fn new<T: Iterator<Item = Info>, U: Iterator<Item = Info>>(
         lheader: &[usize; 4],
-        llines: T,
+        linfo: T,
         rheader: &[usize; 4],
-        rlines: U,
+        rinfo: U,
     ) -> Result<Merge, MergeError> {
         let (header, data) =
-            merge_fn::merge_fn(lheader, llines, rheader, rlines)?;
+            merge_fn::merge_fn(lheader, linfo, rheader, rinfo)?;
         Ok(Merge { header, data })
     }
 
@@ -31,25 +28,17 @@ impl Merge {
         &self.header
     }
 
-    pub fn merge(
-        mut self,
-        hand: Hand,
-        hunk: Hunk,
-    ) -> Result<Merge, MergeError> {
-        let (header, iter) = hunk.into_data();
-        let (header, data) = merge_fn::merge_fn(
-            &header,
-            std::iter::repeat(hand).zip(iter),
-            &self.header,
-            self.data.into_iter(),
-        )?;
-        Ok(Merge { header, data })
-    }
-
     pub fn into_data(
         mut self,
     ) -> ([usize; 4], impl Iterator<Item = (Hand, String)>) {
         (self.header, self.data.into_iter())
+    }
+
+    pub fn into_info(mut self) -> ([usize; 4], impl Iterator<Item = Info>) {
+        (
+            self.header,
+            iter_right_info(&self.header, self.data.into_iter()),
+        )
     }
 }
 

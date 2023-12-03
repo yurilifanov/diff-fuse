@@ -7,6 +7,8 @@ mod hunk;
 mod input;
 mod macros;
 mod merge;
+mod info;
+
 
 use diff::Diff;
 

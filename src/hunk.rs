@@ -3,6 +3,7 @@ pub mod header;
 
 use crate::error::{MergeError, ParseError};
 use crate::hand::Hand;
+use crate::info::{iter_info, Info};
 use crate::macros::{merge_err, parse_err};
 use crate::merge::Merge;
 use core::cmp::{min, Ordering};
@@ -89,6 +90,14 @@ impl Hunk {
         header::overlap(&self._header, &other._header)
     }
 
+    pub fn into_info(
+        self,
+        hand: Hand,
+    ) -> ([usize; 4], impl Iterator<Item = Info>) {
+        let (header, lines) = self.into_data();
+        (header, iter_info(&header, repeat(hand).zip(lines)))
+    }
+
     pub fn merge<'a>(mut self, other: Hunk) -> Result<Merge, MergeError> {
         if !self.overlaps(&other) {
             return Err(merge_err!(
@@ -99,9 +108,15 @@ impl Hunk {
         }
         Merge::new(
             &self._header,
-            repeat(Hand::Left).zip(self._lines.into_iter().skip(1)),
+            iter_info(
+                &self._header,
+                repeat(Hand::Left).zip(self._lines.into_iter().skip(1)),
+            ),
             &other._header,
-            repeat(Hand::Right).zip(other._lines.into_iter().skip(1)),
+            iter_info(
+                &other._header,
+                repeat(Hand::Right).zip(other._lines.into_iter().skip(1)),
+            ),
         )
     }
 }

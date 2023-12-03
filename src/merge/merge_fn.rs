@@ -1,14 +1,11 @@
 use crate::error::MergeError;
 use crate::hand::Hand;
+use crate::info::{iter_info, Info};
 use crate::macros::merge_err;
-use crate::merge::iter_info::{iter_info, Info};
 use core::cmp::{min, Ordering};
-use std::iter::Peekable;
+use std::iter::{repeat, Peekable};
 
-pub fn merge_fn<
-    T: Iterator<Item = (Hand, String)>,
-    U: Iterator<Item = (Hand, String)>,
->(
+pub fn merge_fn<T: Iterator<Item = Info>, U: Iterator<Item = Info>>(
     lheader: &[usize; 4],
     llines: T,
     rheader: &[usize; 4],
@@ -41,15 +38,15 @@ pub fn merge_fn<
         }
     };
 
-    let mut data: Vec<((usize, usize), (Hand, String))> = Vec::new();
-    for item in merge_iter(lheader, llines, rheader, rlines) {
+    let mut data: Vec<((usize, usize), Info)> = Vec::new();
+    for item in merge_iter(llines, rlines) {
         match item? {
             MergeItem::Single(info) => {
-                data.push((update_counters(&info), info.data()));
+                data.push((update_counters(&info), info));
             }
             MergeItem::Pair((linfo, rinfo)) => {
-                data.push((update_counters(&linfo), linfo.data()));
-                data.push((update_counters(&rinfo), rinfo.data()));
+                data.push((update_counters(&linfo), linfo));
+                data.push((update_counters(&rinfo), rinfo));
             }
             MergeItem::None() => {}
         }
@@ -57,13 +54,16 @@ pub fn merge_fn<
 
     Ok((
         header,
-        sort_data(data)?.into_iter().map(|(_, s)| s).collect(),
+        sort_data(data)?
+            .into_iter()
+            .map(|(_, info)| info.data())
+            .collect(),
     ))
 }
 
 fn sort_data(
-    mut data: Vec<((usize, usize), (Hand, String))>,
-) -> Result<Vec<((usize, usize), (Hand, String))>, MergeError> {
+    mut data: Vec<((usize, usize), Info)>,
+) -> Result<Vec<((usize, usize), Info)>, MergeError> {
     let mut err: Option<MergeError> = None;
     let mut update_err = |e: MergeError| {
         if err.is_none() {
@@ -79,20 +79,20 @@ fn sort_data(
     // - keep the order of lines according to their index
     // - keep the group order according to the group index
     data.sort_unstable_by(
-        |((lhs_group, lhs_index), (_, lhs_line)),
-         ((rhs_group, rhs_index), (_, rhs_line))| {
+        |((lhs_group, lhs_index), (linfo)),
+         ((rhs_group, rhs_index), (rinfo))| {
             if lhs_group != rhs_group {
                 return lhs_group.cmp(rhs_group);
             }
 
-            let lhs_prefix = if let Some(val) = lhs_line.chars().nth(0) {
+            let lhs_prefix = if let Some(val) = linfo.line.chars().nth(0) {
                 val
             } else {
                 update_err(merge_err!("Empty line in sort"));
                 ' '
             };
 
-            let rhs_prefix = if let Some(val) = rhs_line.chars().nth(0) {
+            let rhs_prefix = if let Some(val) = rinfo.line.chars().nth(0) {
                 val
             } else {
                 update_err(merge_err!("Empty line in sort"));
@@ -132,17 +132,12 @@ enum MergeItem {
     Pair((Info, Info)),
 }
 
-fn merge_iter<
-    T: Iterator<Item = (Hand, String)>,
-    U: Iterator<Item = (Hand, String)>,
->(
-    lheader: &[usize; 4],
-    llines: T,
-    rheader: &[usize; 4],
-    rlines: U,
+fn merge_iter<T: Iterator<Item = Info>, U: Iterator<Item = Info>>(
+    linfo: T,
+    rinfo: U,
 ) -> impl Iterator<Item = Result<MergeItem, MergeError>> {
-    let mut liter = iter_info(lheader, llines).peekable();
-    let mut riter = iter_info(rheader, rlines).peekable();
+    let mut liter = linfo.peekable();
+    let mut riter = rinfo.peekable();
     std::iter::from_fn(move || -> Option<Result<MergeItem, MergeError>> {
         println!("{:?} -- {:?}", liter.peek(), riter.peek());
         match [liter.peek(), riter.peek()] {
@@ -262,7 +257,9 @@ fn skip_take<T: Iterator<Item = Info>, U: Iterator<Item = Info>>(
 #[cfg(test)]
 mod tests {
     use crate::hand::Hand;
+    use crate::info::iter_info;
     use crate::merge::merge_fn::merge_fn;
+    use std::iter::repeat;
 
     struct Case<'a> {
         lines: (Vec<&'a str>, Vec<&'a str>),
@@ -274,20 +271,26 @@ mod tests {
         pub fn run(&'a mut self) {
             let result = merge_fn(
                 &self.headers.0,
-                std::iter::repeat(Hand::Left).zip(
-                    self.lines
-                        .0
-                        .clone()
-                        .into_iter()
-                        .map(|s: &str| s.to_string()),
+                iter_info(
+                    &self.headers.0,
+                    repeat(Hand::Left).zip(
+                        self.lines
+                            .0
+                            .clone()
+                            .into_iter()
+                            .map(|s: &str| s.to_string()),
+                    ),
                 ),
                 &self.headers.1,
-                std::iter::repeat(Hand::Right).zip(
-                    self.lines
-                        .1
-                        .clone()
-                        .into_iter()
-                        .map(|s: &str| s.to_string()),
+                iter_info(
+                    &self.headers.1,
+                    repeat(Hand::Right).zip(
+                        self.lines
+                            .1
+                            .clone()
+                            .into_iter()
+                            .map(|s: &str| s.to_string()),
+                    ),
                 ),
             );
 

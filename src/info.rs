@@ -35,7 +35,7 @@ pub fn iter_info<T: Iterator<Item = (Hand, String)>>(
     let (mut lrank, mut rrank) = (header[2], header[0]);
     std::iter::from_fn(move || -> Option<Info> {
         let (hand, line) = iter.next()?;
-        let result = match hand {
+        let info = match hand {
             Hand::Left => Info {
                 line,
                 rank: lrank,
@@ -47,22 +47,70 @@ pub fn iter_info<T: Iterator<Item = (Hand, String)>>(
                 hand,
             },
         };
-        if result.line.starts_with('-') {
+        if info.line.starts_with('-') {
             rrank += 1;
-        } else if result.line.starts_with('+') {
+        } else if info.line.starts_with('+') {
             lrank += 1;
         } else {
             lrank += 1;
             rrank += 1;
         }
-        Some(result)
+        Some(info)
+    })
+}
+
+pub fn iter_left_info<T: Iterator<Item = (Hand, String)>>(
+    header: &[usize; 4],
+    mut iter: T,
+) -> impl Iterator<Item = Info> {
+    let (mut lrank, mut rrank) = (header[2], header[0]);
+    std::iter::from_fn(move || -> Option<Info> {
+        let (hand, line) = iter.next()?;
+        let info = Info {
+            line,
+            rank: lrank,
+            hand,
+        };
+        if info.line.starts_with('-') {
+            rrank += 1;
+        } else if info.line.starts_with('+') {
+            lrank += 1;
+        } else {
+            lrank += 1;
+            rrank += 1;
+        }
+        Some(info)
+    })
+}
+
+pub fn iter_right_info<T: Iterator<Item = (Hand, String)>>(
+    header: &[usize; 4],
+    mut iter: T,
+) -> impl Iterator<Item = Info> {
+    let (mut lrank, mut rrank) = (header[2], header[0]);
+    std::iter::from_fn(move || -> Option<Info> {
+        let (hand, line) = iter.next()?;
+        let info = Info {
+            line,
+            rank: rrank,
+            hand,
+        };
+        if info.line.starts_with('-') {
+            rrank += 1;
+        } else if info.line.starts_with('+') {
+            lrank += 1;
+        } else {
+            lrank += 1;
+            rrank += 1;
+        }
+        Some(info)
     })
 }
 
 #[cfg(test)]
 mod tests {
     use crate::hand::Hand;
-    use crate::merge::iter_info::{iter_info, Info};
+    use crate::info::{iter_info, Info};
 
     fn split(line: &str) -> impl Iterator<Item = String> + '_ {
         line.char_indices()
