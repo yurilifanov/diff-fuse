@@ -1,3 +1,4 @@
+mod hand;
 mod header;
 mod iter_info;
 mod merge;

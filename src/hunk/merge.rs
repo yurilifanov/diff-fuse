@@ -1,5 +1,6 @@
 use crate::error::MergeError;
-use crate::hunk::iter_info::{iter_info, Info, InfoType};
+use crate::hunk::hand::Hand;
+use crate::hunk::iter_info::{iter_info, Info};
 use crate::macros::merge_err;
 use core::cmp::{min, Ordering};
 use std::iter::Peekable;
@@ -74,7 +75,7 @@ fn sort_lines(
     //     - '+' lines, if any, last
     // - keep the order of lines according to their index
     // - keep the group order according to the group index
-    lines.sort_by(
+    lines.sort_unstable_by(
         |((lhs_group, lhs_index), lhs_line),
          ((rhs_group, rhs_index), rhs_line)| {
             if lhs_group != rhs_group {
@@ -134,14 +135,18 @@ fn merge_iter<T: Iterator<Item = String>, U: Iterator<Item = String>>(
     rheader: &[usize; 4],
     rlines: U,
 ) -> impl Iterator<Item = Result<MergeItem, MergeError>> {
-    let mut liter = iter_info(lheader, llines, InfoType::Minus()).peekable();
-    let mut riter = iter_info(rheader, rlines, InfoType::Plus()).peekable();
+    let mut liter =
+        iter_info(lheader, std::iter::repeat(Hand::Left).zip(llines))
+            .peekable();
+    let mut riter =
+        iter_info(rheader, std::iter::repeat(Hand::Right).zip(rlines))
+            .peekable();
     std::iter::from_fn(move || -> Option<Result<MergeItem, MergeError>> {
         match [liter.peek(), riter.peek()] {
             [None, None] => None,
             [None, Some(_)] => take(&mut riter),
             [Some(_), None] => take(&mut liter),
-            [Some(linfo), Some(rinfo)] => match linfo.cmp(&rinfo) {
+            [Some(linfo), Some(rinfo)] => match linfo.hand.cmp(&rinfo.hand) {
                 Ordering::Less => match linfo.rank.cmp(&rinfo.rank) {
                     Ordering::Less => take(&mut liter),
                     Ordering::Greater => take(&mut riter),

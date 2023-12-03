@@ -1,60 +1,65 @@
+use crate::hunk::hand::Hand;
 use core::cmp::Ordering;
 
 #[derive(Debug, PartialEq)]
 pub struct Info {
     pub line: String,
     pub rank: usize,
+    pub hand: Hand,
 }
 
 impl Info {
     pub fn prefix(&self) -> char {
         self.line.chars().nth(0).unwrap_or(' ')
     }
-
-    pub fn cmp(&self, other: &Info) -> Ordering {
-        // FIXME
-        Ordering::Less
-    }
 }
 
-impl From<(&str, usize)> for Info {
-    fn from(tuple: (&str, usize)) -> Info {
+impl From<(&str, usize, Hand)> for Info {
+    fn from(tuple: (&str, usize, Hand)) -> Info {
         Info {
             line: tuple.0.to_string(),
             rank: tuple.1,
+            hand: tuple.2,
         }
     }
 }
 
-pub enum InfoType {
-    Minus(),
-    Plus(),
-}
-
-pub fn iter_info<T: Iterator<Item = String>>(
+pub fn iter_info<T: Iterator<Item = (Hand, String)>>(
     header: &[usize; 4],
     mut iter: T,
-    info_type: InfoType,
 ) -> impl Iterator<Item = Info> {
-    let (prefix, mut rank) = match info_type {
-        InfoType::Minus() => ("-", header[2]),
-        InfoType::Plus() => ("+", header[0]),
-    };
+    let (mut lrank, mut rrank) = (header[2], header[0]);
     std::iter::from_fn(move || -> Option<Info> {
-        let line = iter.next()?;
-        if line.starts_with(prefix) {
-            Some(Info { line, rank })
+        let (hand, line) = iter.next()?;
+        let result = match hand {
+            Hand::Left => Info {
+                line,
+                rank: lrank,
+                hand,
+            },
+            Hand::Right => Info {
+                line,
+                rank: rrank,
+                hand,
+            },
+        };
+        if result.line.starts_with('-') {
+            rrank += 1;
+        } else if result.line.starts_with('+') {
+            lrank += 1;
         } else {
-            let result = Some(Info { line, rank });
-            rank += 1;
-            result
+            lrank += 1;
+            rrank += 1;
         }
+        Some(result)
     })
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::hunk::iter_info::{iter_info, Info, InfoType};
+    use crate::hunk::hand::Hand;
+    use crate::hunk::iter_info::{iter_info, Info};
+
     fn split(line: &str) -> impl Iterator<Item = String> + '_ {
         line.char_indices()
             .zip(line.char_indices().skip(1).chain(Some((line.len(), ' '))))
@@ -64,10 +69,11 @@ mod tests {
     fn test(
         header: [usize; 4],
         data: &str,
-        info_type: InfoType,
-        expected: Vec<(&str, usize)>,
+        hand: Hand,
+        expected: Vec<(&str, usize, Hand)>,
     ) {
-        let actual = iter_info(&header, split(data), info_type);
+        let actual =
+            iter_info(&header, std::iter::repeat(hand).zip(split(data)));
         for (act, exp) in actual.zip(expected.into_iter()) {
             assert_eq!(act, Info::from(exp));
         }
@@ -78,17 +84,17 @@ mod tests {
         test(
             [1, 0, 1, 0],
             "+ -+ +- -",
-            InfoType::Minus(),
+            Hand::Left,
             vec![
-                ("+", 1),
-                (" ", 2),
-                ("-", 3),
-                ("+", 3),
-                (" ", 4),
-                ("+", 5),
-                ("-", 6),
-                (" ", 6),
-                ("-", 7),
+                ("+", 1, Hand::Left),
+                (" ", 2, Hand::Left),
+                ("-", 3, Hand::Left),
+                ("+", 3, Hand::Left),
+                (" ", 4, Hand::Left),
+                ("+", 5, Hand::Left),
+                ("-", 6, Hand::Left),
+                (" ", 6, Hand::Left),
+                ("-", 7, Hand::Left),
             ],
         );
     }
@@ -98,8 +104,14 @@ mod tests {
         test(
             [3, 0, 1, 0],
             "+++- ",
-            InfoType::Plus(),
-            vec![("+", 3), ("+", 3), ("+", 3), ("-", 3), (" ", 4)],
+            Hand::Right,
+            vec![
+                ("+", 3, Hand::Right),
+                ("+", 3, Hand::Right),
+                ("+", 3, Hand::Right),
+                ("-", 3, Hand::Right),
+                (" ", 4, Hand::Right),
+            ],
         );
     }
 }
