@@ -70,8 +70,9 @@ impl Mergeable<Merge> for HandedHunk {
     }
 
     fn merge(mut self, other: Merge) -> Result<Merge, MergeError> {
+        let hand = self.hand.clone();
         let (lheader, liter) = self.into_info();
-        let (rheader, riter) = other.into_info();
+        let (rheader, riter) = other.into_info(hand);
         Merge::new(&lheader, liter, &rheader, riter)
     }
 }

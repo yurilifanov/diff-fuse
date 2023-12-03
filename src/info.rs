@@ -59,51 +59,49 @@ pub fn iter_info<T: Iterator<Item = (Hand, String)>>(
     })
 }
 
-pub fn iter_left_info<T: Iterator<Item = (Hand, String)>>(
+pub fn iter_info_X<T: Iterator<Item = (Hand, String)>>(
     header: &[usize; 4],
+    h: Hand,
     mut iter: T,
 ) -> impl Iterator<Item = Info> {
     let (mut lrank, mut rrank) = (header[2], header[0]);
     std::iter::from_fn(move || -> Option<Info> {
-        let (hand, line) = iter.next()?;
-        let info = Info {
-            line,
-            rank: lrank,
-            hand,
-        };
-        if info.line.starts_with('-') {
-            rrank += 1;
-        } else if info.line.starts_with('+') {
-            lrank += 1;
-        } else {
-            lrank += 1;
-            rrank += 1;
+        match h {
+            Hand::Right => {
+                let (hand, line) = iter.next()?;
+                let info = Info {
+                    line,
+                    rank: lrank,
+                    hand,
+                };
+                if info.line.starts_with('-') {
+                    rrank += 1;
+                } else if info.line.starts_with('+') {
+                    lrank += 1;
+                } else {
+                    lrank += 1;
+                    rrank += 1;
+                }
+                Some(info)
+            }
+            Hand::Left => {
+                let (hand, line) = iter.next()?;
+                let info = Info {
+                    line,
+                    rank: rrank,
+                    hand,
+                };
+                if info.line.starts_with('-') {
+                    rrank += 1;
+                } else if info.line.starts_with('+') {
+                    lrank += 1;
+                } else {
+                    lrank += 1;
+                    rrank += 1;
+                }
+                Some(info)
+            }
         }
-        Some(info)
-    })
-}
-
-pub fn iter_right_info<T: Iterator<Item = (Hand, String)>>(
-    header: &[usize; 4],
-    mut iter: T,
-) -> impl Iterator<Item = Info> {
-    let (mut lrank, mut rrank) = (header[2], header[0]);
-    std::iter::from_fn(move || -> Option<Info> {
-        let (hand, line) = iter.next()?;
-        let info = Info {
-            line,
-            rank: rrank,
-            hand,
-        };
-        if info.line.starts_with('-') {
-            rrank += 1;
-        } else if info.line.starts_with('+') {
-            lrank += 1;
-        } else {
-            lrank += 1;
-            rrank += 1;
-        }
-        Some(info)
     })
 }
 

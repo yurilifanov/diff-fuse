@@ -3,7 +3,7 @@ mod merge_fn;
 use crate::error::MergeError;
 use crate::hand::Hand;
 use crate::hunk::{header, Hunk};
-use crate::info::{iter_left_info, iter_right_info, Info};
+use crate::info::{iter_info_X, Info};
 use crate::macros::merge_err;
 
 #[derive(Debug)]
@@ -34,10 +34,13 @@ impl Merge {
         (self.header, self.data.into_iter())
     }
 
-    pub fn into_info(mut self) -> ([usize; 4], impl Iterator<Item = Info>) {
+    pub fn into_info(
+        mut self,
+        hand: Hand,
+    ) -> ([usize; 4], impl Iterator<Item = Info>) {
         (
             self.header,
-            iter_right_info(&self.header, self.data.into_iter()),
+            iter_info_X(&self.header, hand, self.data.into_iter()),
         )
     }
 }
