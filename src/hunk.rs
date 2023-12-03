@@ -1,12 +1,12 @@
-mod hand;
-mod header;
-mod iter_info;
-mod merge;
+pub mod handed;
+pub mod header;
 
 use crate::error::{MergeError, ParseError};
+use crate::hand::Hand;
 use crate::macros::{merge_err, parse_err};
+use crate::merge::Merge;
 use core::cmp::{min, Ordering};
-use std::iter::Peekable;
+use std::iter::{repeat, Peekable};
 
 #[derive(Clone, Debug)]
 pub struct Hunk {
@@ -15,6 +15,11 @@ pub struct Hunk {
 }
 
 impl Hunk {
+    pub fn new(_header: [usize; 4], mut _lines: Vec<String>) -> Hunk {
+        _lines.insert(0, header::dump(&_header));
+        Hunk { _header, _lines }
+    }
+
     pub fn cmp(&self, other: &Hunk) -> Ordering {
         let [lhs_mmin, _, lhs_pmin, _] = self._header;
         let [rhs_mmin, _, rhs_pmin, _] = other._header;
@@ -68,37 +73,23 @@ impl Hunk {
         }
     }
 
+    pub fn header(&self) -> &[usize; 4] {
+        &self._header
+    }
+
     pub fn lines(&self) -> &Vec<String> {
         &self._lines
     }
 
-    fn minus_range(&self) -> [usize; 2] {
-        [self._header[0], self._header[0] + self._header[1]]
-    }
-
-    fn plus_range(&self) -> [usize; 2] {
-        [self._header[2], self._header[2] + self._header[3]]
+    pub fn into_data(mut self) -> ([usize; 4], impl Iterator<Item = String>) {
+        (self._header, self._lines.into_iter().skip(1))
     }
 
     pub fn overlaps(&self, other: &Hunk) -> bool {
-        {
-            let [lhs_min, lhs_max] = self.minus_range();
-            let [rhs_min, rhs_max] = other.minus_range();
-            if lhs_min <= rhs_max && rhs_min <= lhs_max {
-                return true;
-            }
-        }
-        {
-            let [lhs_min, lhs_max] = self.plus_range();
-            let [rhs_min, rhs_max] = other.plus_range();
-            if lhs_min <= rhs_max && rhs_min <= lhs_max {
-                return true;
-            }
-        }
-        false
+        header::overlap(&self._header, &other._header)
     }
 
-    pub fn merge<'a>(mut self, other: Hunk) -> Result<Hunk, MergeError> {
+    pub fn merge<'a>(mut self, other: Hunk) -> Result<Merge, MergeError> {
         if !self.overlaps(&other) {
             return Err(merge_err!(
                 "Expected hunks {:?} and {:?} to overlap, but they do not",
@@ -106,14 +97,12 @@ impl Hunk {
                 other._header
             ));
         }
-        let (_header, mut _lines) = merge::merge(
+        Merge::new(
             &self._header,
-            self._lines.into_iter().skip(1),
+            repeat(Hand::Left).zip(self._lines.into_iter().skip(1)),
             &other._header,
-            other._lines.into_iter().skip(1),
-        )?;
-        _lines.insert(0, header::dump(&_header));
-        Ok(Hunk { _header, _lines })
+            repeat(Hand::Right).zip(other._lines.into_iter().skip(1)),
+        )
     }
 }
 
@@ -124,85 +113,5 @@ impl std::fmt::Display for Hunk {
         } else {
             write!(f, "[no lines; header = {:?}]", self._header)
         }
-    }
-}
-
-#[cfg(test)]
-mod test_merge {
-    use crate::hunk::Hunk;
-
-    fn test(left: &str, right: &str, expected: &str) {
-        let lhs = Hunk::from_lines(&mut left.lines().peekable());
-        let rhs = Hunk::from_lines(&mut right.lines().peekable());
-        match (lhs, rhs) {
-            (Ok(lhunk), Ok(rhunk)) => match lhunk.merge(rhunk) {
-                Ok(merged) => {
-                    let actual: Vec<_> =
-                        merged._lines.iter().map(|s| s.as_str()).collect();
-                    assert_eq!(
-                        actual,
-                        expected.lines().collect::<Vec<&str>>()
-                    );
-                }
-                Err(err) => panic!("Error: {:?}", err),
-            },
-            (left, right) => panic!("Unexpected case: {:?}", (left, right)),
-        }
-    }
-
-    #[test]
-    fn case_1() {
-        test(
-            "\
-@@ -1 +1 @@
--a
-+b
-",
-            "\
-@@ -1 +1,2 @@
--b
-+c
-+d
-",
-            "\
-@@ -1 +1,2 @@
--a
-+c
-+d
-",
-        );
-    }
-
-    #[test]
-    fn case_2() {
-        test(
-            "\
-@@ -2,4 +2,5 @@
- 3
- 4
- 5
-+6
- 7
-",
-            "\
-@@ -1,5 +1,6 @@
- 1
-+2
- 3
- 4
- 5
- 6
-",
-            "\
-@@ -1,5 +1,7 @@
- 1
-+2
- 3
- 4
- 5
-+6
- 7
-",
-        );
     }
 }

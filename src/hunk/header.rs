@@ -37,6 +37,22 @@ pub fn parse(header: &str) -> Result<[usize; 4], ParseError> {
     Ok(result)
 }
 
+pub fn overlap(lheader: &[usize; 4], rheader: &[usize; 4]) -> bool {
+    let [lhs_min, lhs_max] = minus_range(lheader);
+    let [rhs_min, rhs_max] = minus_range(rheader);
+    if lhs_min < rhs_max && rhs_min < lhs_max {
+        return true;
+    }
+
+    let [lhs_min, lhs_max] = plus_range(lheader);
+    let [rhs_min, rhs_max] = plus_range(rheader);
+    if lhs_min < rhs_max && rhs_min < lhs_max {
+        return true;
+    }
+
+    false
+}
+
 pub fn dump(header: &[usize; 4]) -> String {
     let [mut mmin, mnum, mut pmin, pnum] = *header;
     if mnum == 0 {
@@ -51,6 +67,14 @@ pub fn dump(header: &[usize; 4]) -> String {
         [1, _] => format!("@@ -{mmin} +{pmin},{pnum} @@"),
         _ => format!("@@ -{mmin},{mnum} +{pmin},{pnum} @@"),
     }
+}
+
+fn minus_range(header: &[usize; 4]) -> [usize; 2] {
+    [header[0], header[0] + header[1]]
+}
+
+fn plus_range(header: &[usize; 4]) -> [usize; 2] {
+    [header[2], header[2] + header[3]]
 }
 
 #[cfg(test)]

@@ -1,10 +1,12 @@
 // mod flagged_hunk;
 
 use crate::error::{MergeError, ParseError};
+use crate::hand::Hand;
 use crate::header::Header;
+use crate::hunk::handed::{HandedHunk, Mergeable};
 use crate::hunk::Hunk;
 use crate::macros::{debugln, merge_err, parse_err};
-// use core::cmp::Ordering;
+use core::cmp::Ordering;
 use std::iter::Peekable;
 use std::slice::Iter;
 // use flagged_hunk::{FlaggedHunk, HunkAdapter};
@@ -124,82 +126,79 @@ impl FileDiff {
         }
 
         debugln!("Merging {lhs_file}");
-        // let mut lhs = self._hunks.into_iter().peekable();
-        // let mut rhs = other._hunks.into_iter().peekable();
+        let mut lhs = self._hunks.into_iter().peekable();
+        let mut rhs = other._hunks.into_iter().peekable();
 
-        // type Flagged<'a> = FlaggedHunk<'a>;
+        // lhs or rhs hunks in correct order
+        let mut combined_iter =
+            std::iter::from_fn(move || -> Option<HandedHunk> {
+                let hunk: HandedHunk = match (lhs.peek(), rhs.peek()) {
+                    (None, None) => {
+                        return None;
+                    }
+                    (None, Some(_)) => (Hand::Right, rhs.next()?).into(),
+                    (Some(_), None) => (Hand::Left, lhs.next()?).into(),
+                    (Some(lhunk), Some(rhunk)) => match lhunk.cmp(rhunk) {
+                        Ordering::Less => (Hand::Left, lhs.next()?).into(),
+                        Ordering::Greater => (Hand::Right, rhs.next()?).into(),
+                        Ordering::Equal => (Hand::Left, lhs.next()?).into(),
+                    },
+                };
+                Some(hunk)
+            })
+            .peekable();
 
-        // // lhs or rhs hunks in correct order
-        // let mut combined_iter =
-        //     std::iter::from_fn(move || -> Option<Flagged> {
-        //         match (lhs.peek(), rhs.peek()) {
-        //             (None, None) => None,
-        //             (None, Some(_)) => rhs.next().map(Flagged::Right),
-        //             (Some(_), None) => lhs.next().map(Flagged::Left),
-        //             (Some(lhunk), Some(rhunk)) => match lhunk.cmp(rhunk) {
-        //                 Ordering::Less => lhs.next().map(Flagged::Left),
-        //                 Ordering::Greater => rhs.next().map(Flagged::Right),
-        //                 Ordering::Equal => lhs.next().map(Flagged::Left),
-        //             },
-        //         }
-        //     })
-        //     .peekable();
+        // FIXME: hunk headers should be adjusted
 
-        // // FIXME: hunk headers should be adjusted
-        // // FIXME: chain left and right iterators, then merge the chained
+        let merge_iter =
+            std::iter::from_fn(move || -> Option<Result<Hunk, MergeError>> {
+                let next = combined_iter.next()?;
+                if let Some(peek) = combined_iter.peek() {
+                    if !next.overlaps(peek) {
+                        return Some(Ok(next.into()));
+                    }
 
-        // // merged or cloned hunks
-        // let merge_iter =
-        //     std::iter::from_fn(move || -> Option<Result<Hunk, MergeError>> {
-        //         let next = combined_iter.next()?;
-        //         if let Some(peek) = combined_iter.peek() {
-        //             if !next.overlaps(peek) {
-        //                 return Some(Ok(next.hunk().clone()));
-        //             }
+                    debugln!("Merging hunks {next} and {peek}");
+                    let mut merge = match next.merge(combined_iter.next()?) {
+                        Ok(m) => m,
+                        Err(err) => {
+                            return Some(Err(err));
+                        }
+                    };
 
-        //             // TODO: there must be a more egonomic way
-        //             debugln!("Merging hunks {next} and {peek}");
-        //             let mut merged = match next.merge(peek) {
-        //                 Ok(hunk) => hunk,
-        //                 Err(err) => {
-        //                     return Some(Err(err));
-        //                 }
-        //             };
-        //             combined_iter.next();
+                    while let Some(peek) = combined_iter.peek() {
+                        if !peek.overlaps(&merge) {
+                            return Some(Ok(merge.into()));
+                        }
 
-        //             while let Some(peek) = combined_iter.peek() {
-        //                 if !peek.overlaps(&merged) {
-        //                     return Some(Ok(merged));
-        //                 }
-        //                 merged = match peek.merge(&merged) {
-        //                     Ok(hunk) => hunk,
-        //                     Err(err) => {
-        //                         return Some(Err(err));
-        //                     }
-        //                 };
-        //                 combined_iter.next();
-        //             }
+                        debugln!("Merging hunks {merge} (merged) and {peek}");
+                        println!("{merge:?}");
+                        merge = match combined_iter.next()?.merge(merge) {
+                            Ok(m) => m,
+                            Err(err) => {
+                                return Some(Err(err));
+                            }
+                        };
+                    }
 
-        //             return Some(Ok(merged));
-        //         }
-        //         Some(Ok(next.hunk().clone()))
-        //     });
+                    return Some(Ok(merge.into()));
+                }
+                Some(Ok(next.into()))
+            });
 
-        // let mut hunks: Vec<Hunk> = Vec::new();
-        // let mut _num_lines = self._header.lines().len();
-        // for item in merge_iter {
-        //     let hunk = item?;
-        //     _num_lines += hunk.lines().len();
-        //     hunks.push(hunk);
-        // }
+        let mut hunks: Vec<Hunk> = Vec::new();
+        let mut _num_lines = self._header.lines().len();
+        for item in merge_iter {
+            let hunk = item?;
+            _num_lines += hunk.lines().len();
+            hunks.push(hunk);
+        }
 
-        // Ok(FileDiff {
-        //     _header: self._header.clone(),
-        //     _hunks: hunks,
-        //     _num_lines,
-        // })
-
-        todo!()
+        Ok(FileDiff {
+            _header: self._header.clone(),
+            _hunks: hunks,
+            _num_lines,
+        })
     }
 }
 
@@ -258,6 +257,163 @@ Index: test.txt
 @@ -3 +3 @@
 -a
 +b
+",
+        );
+    }
+}
+
+#[cfg(test)]
+mod test_merge {
+    use crate::file_diff::FileDiff;
+
+    fn test(lhs: &str, rhs: &str, expected: &str) {
+        let ldiff = match FileDiff::from_lines(&mut lhs.lines().peekable()) {
+            Ok(diff) => diff,
+            Err(err) => {
+                panic!("{err:?}");
+            }
+        };
+
+        let rdiff = match FileDiff::from_lines(&mut rhs.lines().peekable()) {
+            Ok(diff) => diff,
+            Err(err) => {
+                panic!("{err:?}");
+            }
+        };
+
+        let merged = match ldiff.merge(rdiff) {
+            Ok(diff) => diff,
+            Err(err) => {
+                panic!("{err:?}");
+            }
+        };
+
+        assert_eq!(expected, merged.to_string().as_str());
+    }
+
+    #[test]
+    fn case_1() {
+        test(
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1 +1 @@
+-a
++b
+",
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1 +1 @@
+-b
++c
+",
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1 +1 @@
+-a
++c
+",
+        );
+    }
+
+    #[test]
+    fn case_2() {
+        test(
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1 +1 @@
+-a
++1
+@@ -2 +2 @@
+-b
++2
+@@ -3 +3 @@
+-c
++3
+",
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1,3 +1,3 @@
+-1
+-2
+-3
++i
++ii
++iii
+",
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1,3 +1,3 @@
+-a
+-b
+-c
++i
++ii
++iii
+",
+        );
+    }
+
+    #[test]
+    fn case_3() {
+        test(
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1,3 +1,3 @@
+-1
+-2
+-3
++i
++ii
++iii
+",
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1 +1 @@
+-i
++a
+@@ -2 +2 @@
+-ii
++b
+@@ -3 +3 @@
+-iii
++c
+",
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1,3 +1,3 @@
+-1
+-2
+-3
++a
++b
++c
 ",
         );
     }

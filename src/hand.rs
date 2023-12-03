@@ -19,7 +19,7 @@ impl Hand {
 
 #[cfg(test)]
 mod tests {
-    use crate::hunk::hand::Hand;
+    use crate::hand::Hand;
     use core::cmp::Ordering;
 
     #[test]

@@ -1,16 +1,19 @@
 use crate::error::MergeError;
-use crate::hunk::hand::Hand;
-use crate::hunk::iter_info::{iter_info, Info};
+use crate::hand::Hand;
 use crate::macros::merge_err;
+use crate::merge::iter_info::{iter_info, Info};
 use core::cmp::{min, Ordering};
 use std::iter::Peekable;
 
-pub fn merge<T: Iterator<Item = String>, U: Iterator<Item = String>>(
+pub fn merge_fn<
+    T: Iterator<Item = (Hand, String)>,
+    U: Iterator<Item = (Hand, String)>,
+>(
     lheader: &[usize; 4],
     llines: T,
     rheader: &[usize; 4],
     rlines: U,
-) -> Result<([usize; 4], Vec<String>), MergeError> {
+) -> Result<([usize; 4], Vec<(Hand, String)>), MergeError> {
     let mut header: [usize; 4] = [
         min(lheader[0], rheader[0]),
         0,
@@ -21,12 +24,12 @@ pub fn merge<T: Iterator<Item = String>, U: Iterator<Item = String>>(
     let mut counters: (usize, usize, usize) = (0, 0, 0);
 
     // returns (group, index)
-    let mut update_counters = |s: &String| {
-        if s.starts_with('-') {
+    let mut update_counters = |info: &Info| {
+        if info.line.starts_with('-') {
             counters.1 += 1;
             header[1] += 1;
             (counters.0, counters.1)
-        } else if s.starts_with('+') {
+        } else if info.line.starts_with('+') {
             counters.2 += 1;
             header[3] += 1;
             (counters.0, counters.2)
@@ -38,15 +41,15 @@ pub fn merge<T: Iterator<Item = String>, U: Iterator<Item = String>>(
         }
     };
 
-    let mut lines: Vec<((usize, usize), String)> = Vec::new();
+    let mut data: Vec<((usize, usize), (Hand, String))> = Vec::new();
     for item in merge_iter(lheader, llines, rheader, rlines) {
         match item? {
-            MergeItem::Single(line) => {
-                lines.push((update_counters(&line), line));
+            MergeItem::Single(info) => {
+                data.push((update_counters(&info), info.data()));
             }
-            MergeItem::Pair((lline, rline)) => {
-                lines.push((update_counters(&lline), lline));
-                lines.push((update_counters(&rline), rline));
+            MergeItem::Pair((linfo, rinfo)) => {
+                data.push((update_counters(&linfo), linfo.data()));
+                data.push((update_counters(&rinfo), rinfo.data()));
             }
             MergeItem::None() => {}
         }
@@ -54,13 +57,13 @@ pub fn merge<T: Iterator<Item = String>, U: Iterator<Item = String>>(
 
     Ok((
         header,
-        sort_lines(lines)?.into_iter().map(|(_, s)| s).collect(),
+        sort_data(data)?.into_iter().map(|(_, s)| s).collect(),
     ))
 }
 
-fn sort_lines(
-    mut lines: Vec<((usize, usize), String)>,
-) -> Result<Vec<((usize, usize), String)>, MergeError> {
+fn sort_data(
+    mut data: Vec<((usize, usize), (Hand, String))>,
+) -> Result<Vec<((usize, usize), (Hand, String))>, MergeError> {
     let mut err: Option<MergeError> = None;
     let mut update_err = |e: MergeError| {
         if err.is_none() {
@@ -75,9 +78,9 @@ fn sort_lines(
     //     - '+' lines, if any, last
     // - keep the order of lines according to their index
     // - keep the group order according to the group index
-    lines.sort_unstable_by(
-        |((lhs_group, lhs_index), lhs_line),
-         ((rhs_group, rhs_index), rhs_line)| {
+    data.sort_unstable_by(
+        |((lhs_group, lhs_index), (_, lhs_line)),
+         ((rhs_group, rhs_index), (_, rhs_line))| {
             if lhs_group != rhs_group {
                 return lhs_group.cmp(rhs_group);
             }
@@ -120,28 +123,28 @@ fn sort_lines(
     if let Some(e) = err {
         return Err(e);
     }
-    Ok(lines)
+    Ok(data)
 }
 
 enum MergeItem {
     None(),
-    Single(String),
-    Pair((String, String)),
+    Single(Info),
+    Pair((Info, Info)),
 }
 
-fn merge_iter<T: Iterator<Item = String>, U: Iterator<Item = String>>(
+fn merge_iter<
+    T: Iterator<Item = (Hand, String)>,
+    U: Iterator<Item = (Hand, String)>,
+>(
     lheader: &[usize; 4],
     llines: T,
     rheader: &[usize; 4],
     rlines: U,
 ) -> impl Iterator<Item = Result<MergeItem, MergeError>> {
-    let mut liter =
-        iter_info(lheader, std::iter::repeat(Hand::Left).zip(llines))
-            .peekable();
-    let mut riter =
-        iter_info(rheader, std::iter::repeat(Hand::Right).zip(rlines))
-            .peekable();
+    let mut liter = iter_info(lheader, llines).peekable();
+    let mut riter = iter_info(rheader, rlines).peekable();
     std::iter::from_fn(move || -> Option<Result<MergeItem, MergeError>> {
+        println!("{:?} -- {:?}", liter.peek(), riter.peek());
         match [liter.peek(), riter.peek()] {
             [None, None] => None,
             [None, Some(_)] => take(&mut riter),
@@ -163,15 +166,19 @@ fn merge_iter<T: Iterator<Item = String>, U: Iterator<Item = String>>(
                         next(index, &mut riter, &mut liter)
                     }
                 },
-                _ => {
-                    let lline = liter.next()?.line;
-                    let rline = riter.next()?.line;
-                    Some(Err(merge_err!(
-                        "Conflict between lines '{}' and '{}'",
-                        lline,
-                        rline
-                    )))
-                }
+                _ => match linfo.rank.cmp(&rinfo.rank) {
+                    Ordering::Less => take(&mut liter),
+                    Ordering::Greater => take(&mut riter),
+                    _ => {
+                        let lline = liter.next()?.line;
+                        let rline = riter.next()?.line;
+                        Some(Err(merge_err!(
+                            "Conflict between lines '{}' and '{}'",
+                            lline,
+                            rline
+                        )))
+                    }
+                },
             },
         }
     })
@@ -190,13 +197,13 @@ fn next<T: Iterator<Item = Info>, U: Iterator<Item = Info>>(
         [' ', '+'] => take(riter),
         ['+', '+'] => take(riter),
         ['-', '+'] => {
-            let lline = liter.next()?.line;
-            let mut rline = riter.next()?.line;
-            if lline[1..] == rline[1..] {
-                rline.replace_range(0..1, " ");
-                Some(Ok(MergeItem::Single(rline)))
+            let linfo = liter.next()?;
+            let mut rinfo = riter.next()?;
+            if linfo.line[1..] == rinfo.line[1..] {
+                rinfo.line.replace_range(0..1, " ");
+                Some(Ok(MergeItem::Single(rinfo)))
             } else {
-                Some(Ok(MergeItem::Pair((lline, rline))))
+                Some(Ok(MergeItem::Pair((linfo, rinfo))))
             }
         }
 
@@ -217,7 +224,7 @@ fn next<T: Iterator<Item = Info>, U: Iterator<Item = Info>>(
 fn take<T: Iterator<Item = Info>>(
     iter: &mut T,
 ) -> Option<Result<MergeItem, MergeError>> {
-    Some(Ok(MergeItem::Single(iter.next()?.line)))
+    Some(Ok(MergeItem::Single(iter.next()?)))
 }
 
 fn skip<T: Iterator<Item = Info>, U: Iterator<Item = Info>>(
@@ -230,7 +237,7 @@ fn skip<T: Iterator<Item = Info>, U: Iterator<Item = Info>>(
         Some(Ok(MergeItem::None()))
     } else {
         Some(Err(merge_err!(
-            "Mismatch between lines '{lline}' and '{rline}'"
+            "skip: Mismatch between lines '{lline}' and '{rline}'"
         )))
     }
 }
@@ -239,20 +246,23 @@ fn skip_take<T: Iterator<Item = Info>, U: Iterator<Item = Info>>(
     lhs: &mut T,
     rhs: &mut U,
 ) -> Option<Result<MergeItem, MergeError>> {
-    let lline = lhs.next()?.line;
-    let rline = rhs.next()?.line;
-    if lline[1..] != rline[1..] {
-        Some(Err(merge_err!(
-            "Mismatch between lines '{lline}' and '{rline}'"
-        )))
+    let linfo = lhs.next()?;
+    let rinfo = rhs.next()?;
+    if linfo.line[1..] == rinfo.line[1..] {
+        Some(Ok(MergeItem::Single(rinfo)))
     } else {
-        Some(Ok(MergeItem::Single(rline)))
+        Some(Err(merge_err!(
+            "skip_take: Mismatch between lines '{}' and '{}'",
+            linfo.line,
+            rinfo.line
+        )))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::hunk::merge::merge;
+    use crate::hand::Hand;
+    use crate::merge::merge_fn::merge_fn;
 
     struct Case<'a> {
         lines: (Vec<&'a str>, Vec<&'a str>),
@@ -262,23 +272,29 @@ mod tests {
 
     impl<'a> Case<'a> {
         pub fn run(&'a mut self) {
-            let result = merge(
+            let result = merge_fn(
                 &self.headers.0,
-                self.lines
-                    .0
-                    .clone()
-                    .into_iter()
-                    .map(|s: &str| s.to_string()),
+                std::iter::repeat(Hand::Left).zip(
+                    self.lines
+                        .0
+                        .clone()
+                        .into_iter()
+                        .map(|s: &str| s.to_string()),
+                ),
                 &self.headers.1,
-                self.lines
-                    .1
-                    .clone()
-                    .into_iter()
-                    .map(|s: &str| s.to_string()),
+                std::iter::repeat(Hand::Right).zip(
+                    self.lines
+                        .1
+                        .clone()
+                        .into_iter()
+                        .map(|s: &str| s.to_string()),
+                ),
             );
 
             match result {
-                Ok((header, lines)) => {
+                Ok((header, data)) => {
+                    let lines: Vec<_> =
+                        data.into_iter().map(|(_, s)| s).collect();
                     assert_eq!(header, self.expected.0);
                     assert_eq!(lines, self.expected.1);
                 }

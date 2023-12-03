@@ -1,4 +1,4 @@
-use crate::hunk::hand::Hand;
+use crate::hand::Hand;
 use core::cmp::Ordering;
 
 #[derive(Debug, PartialEq)]
@@ -11,6 +11,10 @@ pub struct Info {
 impl Info {
     pub fn prefix(&self) -> char {
         self.line.chars().nth(0).unwrap_or(' ')
+    }
+
+    pub fn data(mut self) -> (Hand, String) {
+        (self.hand, self.line)
     }
 }
 
@@ -57,8 +61,8 @@ pub fn iter_info<T: Iterator<Item = (Hand, String)>>(
 
 #[cfg(test)]
 mod tests {
-    use crate::hunk::hand::Hand;
-    use crate::hunk::iter_info::{iter_info, Info};
+    use crate::hand::Hand;
+    use crate::merge::iter_info::{iter_info, Info};
 
     fn split(line: &str) -> impl Iterator<Item = String> + '_ {
         line.char_indices()
