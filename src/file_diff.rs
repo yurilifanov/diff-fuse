@@ -1,3 +1,5 @@
+pub mod merge_iter;
+
 use crate::error::{MergeError, ParseError};
 use crate::hand::Hand;
 use crate::header::Header;
@@ -123,65 +125,10 @@ impl FileDiff {
         }
 
         debugln!("Merging {lhs_file}");
-        let mut lhs = self._hunks.into_iter().peekable();
-        let mut rhs = other._hunks.into_iter().peekable();
-
-        // lhs or rhs hunks in correct order
-        let mut combined_iter =
-            std::iter::from_fn(move || -> Option<HandedHunk> {
-                let hunk: HandedHunk = match (lhs.peek(), rhs.peek()) {
-                    (None, None) => {
-                        return None;
-                    }
-                    (None, Some(_)) => (Hand::Right, rhs.next()?).into(),
-                    (Some(_), None) => (Hand::Left, lhs.next()?).into(),
-                    (Some(lhunk), Some(rhunk)) => match lhunk.cmp(rhunk) {
-                        Ordering::Less => (Hand::Left, lhs.next()?).into(),
-                        Ordering::Greater => (Hand::Right, rhs.next()?).into(),
-                        Ordering::Equal => (Hand::Left, lhs.next()?).into(),
-                    },
-                };
-                Some(hunk)
-            })
-            .peekable();
-
-        // FIXME: hunk headers should be adjusted
-
-        let merge_iter =
-            std::iter::from_fn(move || -> Option<Result<Hunk, MergeError>> {
-                let next = combined_iter.next()?;
-                if let Some(peek) = combined_iter.peek() {
-                    if !next.overlaps(peek) {
-                        return Some(Ok(next.into()));
-                    }
-
-                    debugln!("Merging hunks {next} and {peek}");
-                    let mut merge = match next.merge(combined_iter.next()?) {
-                        Ok(m) => m,
-                        Err(err) => {
-                            return Some(Err(err));
-                        }
-                    };
-
-                    while let Some(peek) = combined_iter.peek() {
-                        if !peek.overlaps(&merge) {
-                            return Some(Ok(merge.into()));
-                        }
-
-                        debugln!("Merging hunks {merge} (merged) and {peek}");
-                        println!("{merge:?}");
-                        merge = match combined_iter.next()?.merge(merge) {
-                            Ok(m) => m,
-                            Err(err) => {
-                                return Some(Err(err));
-                            }
-                        };
-                    }
-
-                    return Some(Ok(merge.into()));
-                }
-                Some(Ok(next.into()))
-            });
+        let merge_iter = merge_iter::merge_iter(
+            self._hunks.into_iter().peekable(),
+            other._hunks.into_iter().peekable(),
+        );
 
         let mut hunks: Vec<Hunk> = Vec::new();
         let mut _num_lines = self._header.lines().len();
@@ -211,56 +158,7 @@ impl ToString for FileDiff {
 }
 
 #[cfg(test)]
-mod test_parse {
-    use crate::file_diff::FileDiff;
-
-    fn test(expected: &str) {
-        match FileDiff::from_lines(&mut expected.lines().peekable()) {
-            Ok(result) => {
-                assert_eq!(expected, result.to_string().as_str());
-            }
-            Err(err) => {
-                panic!("{err:?}");
-            }
-        }
-    }
-
-    #[test]
-    fn case_1() {
-        test(
-            "\
-Index: test.txt
-===================================================================
---- test.txt
-+++ test.txt
-@@ -1 +1 @@
--a
-+b
-",
-        );
-    }
-
-    #[test]
-    fn case_2() {
-        test(
-            "\
-Index: test.txt
-===================================================================
---- test.txt
-+++ test.txt
-@@ -1 +1 @@
--a
-+b
-@@ -3 +3 @@
--a
-+b
-",
-        );
-    }
-}
-
-#[cfg(test)]
-mod test_merge {
+mod tests {
     use crate::file_diff::FileDiff;
 
     fn test(lhs: &str, rhs: &str, expected: &str) {
@@ -301,7 +199,7 @@ Index: test.txt
 +b
 ",
             "\
-Index: test.txt
+    Index: test.txt
 ===================================================================
 --- test.txt
 +++ test.txt
@@ -310,7 +208,7 @@ Index: test.txt
 +c
 ",
             "\
-Index: test.txt
+    Index: test.txt
 ===================================================================
 --- test.txt
 +++ test.txt
@@ -458,6 +356,47 @@ Index: test.txt
 +a
 +b
 +c
+",
+        );
+    }
+
+    #[test]
+    fn case_5() {
+        // note that header of hunk in left diff has to change
+        test(
+            "\
+Index: text.txt
+===================================================================
+--- text.txt
++++ text.txt
+@@ -6 +6 @@
+-5
++e
+",
+            "\
+Index: text.txt
+===================================================================
+--- text.txt
++++ text.txt
+@@ -1 +0,0 @@
+-0
+@@ -9 +8 @@
+-8
++viii
+",
+            "\
+Index: text.txt
+===================================================================
+--- text.txt
++++ text.txt
+@@ -1 +0,0 @@
+-0
+@@ -6 +5 @@
+-5
++e
+@@ -9 +8 @@
+-8
++viii
 ",
         );
     }

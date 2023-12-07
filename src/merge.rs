@@ -1,4 +1,4 @@
-mod merge_fn;
+pub mod merge_fn;
 
 use crate::error::MergeError;
 use crate::hand::Hand;

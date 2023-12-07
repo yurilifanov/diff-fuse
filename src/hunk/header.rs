@@ -40,9 +40,14 @@ pub fn parse(header: &str) -> Result<[usize; 4], ParseError> {
 pub fn overlap(lheader: &[usize; 4], rheader: &[usize; 4]) -> bool {
     let [lhs_min, lhs_max] = minus_range(lheader);
     let [rhs_min, rhs_max] = minus_range(rheader);
+
+    println!("overlap -- [{lhs_min}, {lhs_max}), [{rhs_min}, {rhs_max})");
+
     if lhs_min < rhs_max && rhs_min < lhs_max {
         return true;
     }
+
+    println!("overlap -- [{lhs_min}, {lhs_max}), [{rhs_min}, {rhs_max})");
 
     let [lhs_min, lhs_max] = plus_range(lheader);
     let [rhs_min, rhs_max] = plus_range(rheader);

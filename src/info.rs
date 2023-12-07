@@ -66,42 +66,42 @@ pub fn iter_info_X<T: Iterator<Item = (Hand, String)>>(
 ) -> impl Iterator<Item = Info> {
     let (mut lrank, mut rrank) = (header[2], header[0]);
     std::iter::from_fn(move || -> Option<Info> {
-        match h {
-            Hand::Right => {
-                let (hand, line) = iter.next()?;
-                let info = Info {
-                    line,
-                    rank: lrank,
-                    hand,
-                };
-                if info.line.starts_with('-') {
-                    rrank += 1;
-                } else if info.line.starts_with('+') {
-                    lrank += 1;
-                } else {
-                    lrank += 1;
-                    rrank += 1;
-                }
-                Some(info)
-            }
-            Hand::Left => {
-                let (hand, line) = iter.next()?;
-                let info = Info {
-                    line,
-                    rank: rrank,
-                    hand,
-                };
-                if info.line.starts_with('-') {
-                    rrank += 1;
-                } else if info.line.starts_with('+') {
-                    lrank += 1;
-                } else {
-                    lrank += 1;
-                    rrank += 1;
-                }
-                Some(info)
-            }
+        // match h {
+        // Hand::Right => {
+        //     let (hand, line) = iter.next()?;
+        //     let info = Info {
+        //         line,
+        //         rank: lrank,
+        //         hand,
+        //     };
+        //     if info.line.starts_with('-') {
+        //         rrank += 1;
+        //     } else if info.line.starts_with('+') {
+        //         lrank += 1;
+        //     } else {
+        //         lrank += 1;
+        //         rrank += 1;
+        //     }
+        //     Some(info)
+        // }
+        // Hand::Left => {
+        let (hand, line) = iter.next()?;
+        let info = Info {
+            line,
+            rank: rrank,
+            hand,
+        };
+        if info.line.starts_with('-') {
+            rrank += 1;
+        } else if info.line.starts_with('+') {
+            lrank += 1;
+        } else {
+            lrank += 1;
+            rrank += 1;
         }
+        Some(info)
+        // }
+        // }
     })
 }
 
