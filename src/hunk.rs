@@ -82,12 +82,38 @@ impl Hunk {
         &self._lines
     }
 
+    pub fn unpack(self) -> ([usize; 4], std::vec::IntoIter<String>) {
+        let mut lines = self._lines.into_iter();
+        lines.next();
+        (self._header, lines)
+    }
+
     pub fn into_data(mut self) -> ([usize; 4], impl Iterator<Item = String>) {
         (self._header, self._lines.into_iter().skip(1))
     }
 
     pub fn overlaps(&self, other: &Hunk) -> bool {
         header::overlap(&self._header, &other._header)
+    }
+
+    pub fn with_offset(self, offset: &i64) -> Hunk {
+        self
+    }
+
+    fn num_lines_added(&self) -> i64 {
+        0
+    }
+
+    fn num_lines_removed(&self) -> i64 {
+        0
+    }
+
+    pub fn offset(&self) -> i64 {
+        self.num_lines_added() - self.num_lines_removed()
+    }
+
+    pub fn into_lines(mut self) -> std::vec::IntoIter<String> {
+        self._lines.into_iter()
     }
 
     pub fn into_info(
