@@ -20,14 +20,9 @@ pub fn fuse<T: InfoSource>(
     while let Some(item) = drain.next() {
         match item? {
             FuseItem::Single(info) => {
-                // println!("--- {info:?} - {:?} ---", counter.header_fields());
                 data.push((counter.update(&info)?, info));
             }
             FuseItem::Pair((linfo, rinfo)) => {
-                // println!(
-                //     "--- {linfo:?} -- {rinfo:?} -- {:?} ---",
-                //     counter.header_fields()
-                // );
                 data.push((counter.update(&linfo)?, linfo));
                 data.push((counter.update(&rinfo)?, rinfo));
             }
@@ -36,7 +31,6 @@ pub fn fuse<T: InfoSource>(
     }
 
     let fields = counter.header_fields();
-    // println!("--- {fields:?} ---");
     header[1] = fields.0;
     header[3] = fields.1;
 
@@ -68,7 +62,6 @@ impl<T: InfoSource> Drain<T> {
                 Ordering::Less => self.take_left(),
                 Ordering::Greater => self.take_right(),
                 _ => {
-                    // println!("-- {linfo:?} -- {rinfo:?} --");
                     let index = [linfo.prefix(), rinfo.prefix()];
                     self.choose(index)
                 }

@@ -56,22 +56,19 @@ impl<'a> InfoChain<'_> {
         mut hunk_iter: &'a mut Peekable<HunkIter>,
         header_in: &Header,
     ) -> (Option<Header>, Option<&'a Info>) {
-        // let mut ofs: i64 = 0;
         let mut header_out: Option<Header> = None;
         loop {
             if info_iter.peek().is_some() {
                 return (header_out, info_iter.peek());
-            } else if let Some(hunk) = hunk_iter.next() {
-                if !header::overlap(header_in, hunk.header()) {
-                    // return (0, None, None);
+            } else if let Some(peek) = hunk_iter.peek() {
+                if !header::overlap(header_in, peek.header()) {
                     return (None, None);
                 }
-                let (header, lines) = hunk.unpack();
+                let (header, lines) = hunk_iter.next().unwrap().unpack();
                 let info = InfoIter::right(lines, header[0]);
                 header_out = Some(header);
                 *info_iter = info.peekable();
             } else {
-                // return (0, None, None);
                 return (None, None);
             }
         }
@@ -86,11 +83,11 @@ impl<'a> InfoChain<'_> {
         loop {
             if info_iter.peek().is_some() {
                 return (header_out, info_iter.peek());
-            } else if let Some(hunk) = hunk_iter.next() {
-                if !header::overlap(hunk.header(), header_in) {
+            } else if let Some(peek) = hunk_iter.peek() {
+                if !header::overlap(peek.header(), header_in) {
                     return (None, None);
                 }
-                let (header, lines) = hunk.unpack();
+                let (header, lines) = hunk_iter.next().unwrap().unpack();
                 let info = InfoIter::left(lines, header[2]);
                 header_out = Some(header);
                 *info_iter = info.peekable();
@@ -134,11 +131,11 @@ impl<'a> InfoSource for InfoChain<'_> {
         loop {
             if let Some(info) = self.linfo.next() {
                 return Some(info);
-            } else if let Some(hunk) = self.lhunks.next() {
-                if !header::overlap(hunk.header(), &self.rheader) {
+            } else if let Some(peek) = self.lhunks.peek() {
+                if !header::overlap(peek.header(), &self.rheader) {
                     return None;
                 }
-                let (header, lines) = hunk.unpack();
+                let (header, lines) = self.lhunks.next()?.unpack();
                 let info = InfoIter::left(lines, header[2]);
                 self.lheader = header;
                 self.linfo = info.peekable();
@@ -152,11 +149,11 @@ impl<'a> InfoSource for InfoChain<'_> {
         loop {
             if let Some(info) = self.rinfo.next() {
                 return Some(info);
-            } else if let Some(hunk) = self.rhunks.next() {
-                if !header::overlap(&self.lheader, hunk.header()) {
+            } else if let Some(peek) = self.rhunks.peek() {
+                if !header::overlap(&self.lheader, peek.header()) {
                     return None;
                 }
-                let (header, lines) = hunk.unpack();
+                let (header, lines) = self.rhunks.next()?.unpack();
                 let info = InfoIter::right(lines, header[0]);
                 self.rheader = header;
                 self.rinfo = info.peekable();

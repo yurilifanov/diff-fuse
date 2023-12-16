@@ -3,7 +3,7 @@ use crate::fuse::info_chain::{HunkIter, InfoChain};
 
 use crate::error::MergeError;
 use crate::hunk::Hunk;
-use crate::macros::merge_err;
+use crate::macros::{debugln, merge_err};
 
 use core::cmp::Ordering;
 use std::iter::Peekable;
@@ -27,29 +27,42 @@ pub fn fuse_iter(
     // So if hunk z doesn't overlap x or y, it's clear that:
     //   1. rz[0] + rz[1] < min(rx[0], ry[0])
     //   2. rz[2] + rz[3] < min(rx[2], ry[2])
+    debugln!(
+        "Fusing file diffs with {} and {} hunks",
+        lhunks.len(),
+        rhunks.len()
+    );
+
     let mut liter = lhunks.into_iter().peekable();
     let mut riter = rhunks.into_iter().peekable();
     let mut offset = 0i64;
     std::iter::from_fn(move || -> Option<Result<Hunk, MergeError>> {
         match [liter.peek(), riter.peek()] {
             [None, None] => None,
-            [None, Some(_)] => {
+            [None, Some(rhs)] => {
+                debugln!("fuse_iter: right -- {rhs}");
                 let hunk = riter.next()?;
                 offset += hunk.offset();
                 Some(Ok(hunk))
             }
-            [Some(_), None] => Some(liter.next()?.with_offset(offset)),
+            [Some(lhs), None] => {
+                debugln!("fuse_iter: left -- {lhs}, offset -- {offset}");
+                Some(liter.next()?.with_offset(offset))
+            }
             [Some(lhs), Some(rhs)] => {
                 if !lhs.overlaps(rhs) {
                     if lhs.cmp(rhs) == Ordering::Less {
-                        println!("left, offset: {:?}", offset);
+                        debugln!(
+                            "fuse_iter: left -- {lhs}, offset -- {offset}"
+                        );
                         Some(liter.next()?.with_offset(offset))
                     } else {
+                        debugln!("fuse_iter: right -- {rhs}");
                         offset += rhs.offset();
-                        println!("right, offset: {:?}", offset);
                         Some(Ok(riter.next()?))
                     }
                 } else {
+                    debugln!("fuse_iter: Merging {lhs} and {rhs}");
                     match fuse_overlapping(&mut liter, &mut riter) {
                         Ok(hunk) => {
                             offset += hunk.offset();
@@ -66,14 +79,11 @@ pub fn fuse_iter(
 fn fuse_overlapping(
     lhunks: &mut Peekable<HunkIter>,
     rhunks: &mut Peekable<HunkIter>,
-    // offset: &mut i64,
 ) -> Result<Hunk, MergeError> {
     let header = if let (Some(l), Some(r)) = (lhunks.peek(), rhunks.peek()) {
         l.fuse_header(r)
     } else {
         return Err(merge_err!("fuse_overlapping: peek returned None"));
     };
-
-    let chain = InfoChain::new(lhunks, rhunks)?;
-    fuse(header, chain)
+    fuse(header, InfoChain::new(lhunks, rhunks)?)
 }

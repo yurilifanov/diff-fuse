@@ -48,17 +48,27 @@ pub fn fuse(lheader: &[usize; 4], rheader: &[usize; 4]) -> [usize; 4] {
     ]
 }
 
+pub fn contains(header: &[usize; 4], line_number: usize) -> bool {
+    let [min, max] = minus_range(header);
+    if line_number >= min && line_number < max {
+        return true;
+    }
+
+    let [min, max] = plus_range(header);
+    if line_number >= min && line_number < max {
+        return true;
+    }
+
+    return false;
+}
+
 pub fn overlap(lheader: &[usize; 4], rheader: &[usize; 4]) -> bool {
     let [lhs_min, lhs_max] = minus_range(lheader);
     let [rhs_min, rhs_max] = minus_range(rheader);
 
-    println!("overlap -- [{lhs_min}, {lhs_max}), [{rhs_min}, {rhs_max})");
-
     if lhs_min < rhs_max && rhs_min < lhs_max {
         return true;
     }
-
-    println!("overlap -- [{lhs_min}, {lhs_max}), [{rhs_min}, {rhs_max})");
 
     let [lhs_min, lhs_max] = plus_range(lheader);
     let [rhs_min, rhs_max] = plus_range(rheader);
