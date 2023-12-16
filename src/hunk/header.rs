@@ -1,6 +1,8 @@
 use crate::error::ParseError;
 use crate::macros::parse_err;
 
+use core::cmp::min;
+
 pub fn parse(header: &str) -> Result<[usize; 4], ParseError> {
     let group_iter = header
         .strip_prefix("@@ ")
@@ -35,6 +37,15 @@ pub fn parse(header: &str) -> Result<[usize; 4], ParseError> {
     }
 
     Ok(result)
+}
+
+pub fn fuse(lheader: &[usize; 4], rheader: &[usize; 4]) -> [usize; 4] {
+    [
+        min(lheader[0], rheader[0]),
+        0,
+        min(lheader[2], rheader[2]),
+        0,
+    ]
 }
 
 pub fn overlap(lheader: &[usize; 4], rheader: &[usize; 4]) -> bool {

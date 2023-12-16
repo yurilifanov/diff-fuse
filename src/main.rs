@@ -1,7 +1,7 @@
 mod diff;
 mod error;
 mod file_diff;
-mod fuse;
+pub mod fuse;
 mod hand;
 mod header;
 mod hunk;
@@ -28,7 +28,7 @@ fn main() {
     let first_path = path_iter.next().unwrap();
     let diff = path_iter
         .fold(Diff::read(&first_path).unwrap(), |diff, path| {
-            diff.merge(Diff::read(&path).unwrap()).unwrap()
+            diff.fuse(Diff::read(&path).unwrap()).unwrap()
         });
 
     for line in diff.line_iter() {

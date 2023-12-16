@@ -1,9 +1,9 @@
 pub mod merge_iter;
 
 use crate::error::{MergeError, ParseError};
+use crate::fuse::fuse_iter::fuse_iter;
 use crate::hand::Hand;
 use crate::header::Header;
-use crate::hunk::handed::{HandedHunk, Mergeable};
 use crate::hunk::Hunk;
 use crate::macros::{debugln, merge_err, parse_err};
 use core::cmp::Ordering;
@@ -100,22 +100,24 @@ impl FileDiff {
         }
     }
 
+    pub fn fuse(mut self, other: FileDiff) -> Result<FileDiff, MergeError> {
+        let mut hunks: Vec<Hunk> = Vec::new();
+        let mut _num_lines = self._header.lines().len();
+
+        for item in fuse_iter(self._hunks, other._hunks) {
+            let hunk = item?;
+            _num_lines += hunk.lines().len();
+            hunks.push(hunk);
+        }
+
+        Ok(FileDiff {
+            _header: self._header.clone(),
+            _hunks: hunks,
+            _num_lines,
+        })
+    }
+
     pub fn merge(mut self, other: FileDiff) -> Result<FileDiff, MergeError> {
-        // A file diff is an ordered set X[i], i >= 0 of non-overlapping hunks.
-        // Consider two file diffs, X and Y.
-        //
-        // If X[i].overlaps(Y[j]) is false, then:
-        //   1. X[i].overlaps(Y[k]) is false for k > j
-        //   2. X[i].overlaps(X[l].merge(Y[k])) is false for l > i and k >= j
-        //
-        // To see why point 2. applies consider two overlapping hunks x & y.
-        // For headers rx, ry and rxy of x, y amd x.merge(y) respectively:
-        //   1. rxy[0] = min(rx[0], ry[0])
-        //   2. rxy[2] = min(rx[2], ry[2])
-        //
-        // So if hunk z doesn't overlap x or y, it's clear that:
-        //   1. rz[0] + rz[1] < min(rx[0], ry[0])
-        //   2. rz[2] + rz[3] < min(rx[2], ry[2])
         let (lhs_file, rhs_file) =
             (self._header.file_name(), other._header.file_name());
         if lhs_file != rhs_file {
@@ -176,14 +178,14 @@ mod tests {
             }
         };
 
-        let merged = match ldiff.merge(rdiff) {
+        let fused = match ldiff.fuse(rdiff) {
             Ok(diff) => diff,
             Err(err) => {
                 panic!("{err:?}");
             }
         };
 
-        assert_eq!(expected, merged.to_string().as_str());
+        assert_eq!(fused.to_string().as_str(), expected);
     }
 
     #[test]
@@ -362,7 +364,6 @@ Index: test.txt
 
     #[test]
     fn case_5() {
-        // note that header of hunk in left diff has to change
         test(
             "\
 Index: text.txt

@@ -1,14 +1,20 @@
-mod info;
+pub mod core;
+pub mod fuse_iter;
+pub mod info;
 mod info_chain;
-mod info_iter;
+pub mod info_iter;
+pub mod info_source;
+mod line_counter;
 
+use core::fuse;
 use info::Info;
 use info_chain::InfoChain;
 use info_iter::InfoIter;
+use info_source::InfoSource;
 
 #[cfg(test)]
 mod tests {
-    use crate::fuse::{InfoChain, InfoIter};
+    use crate::fuse::{InfoChain, InfoIter, InfoSource};
     use crate::hunk::Hunk;
 
     #[test]
@@ -38,25 +44,18 @@ mod tests {
         .map(|s| Hunk::from_lines(&mut s.lines().peekable()).unwrap())
         .collect();
 
-        let mut offset = 0;
+        let mut liter = left.into_iter().peekable();
+        let mut riter = right.into_iter().peekable();
 
-        let mut chain = InfoChain::new(
-            left.into_iter().peekable(),
-            right.into_iter().peekable(),
-            &mut offset,
-        )
-        .unwrap();
+        let mut chain = InfoChain::new(&mut liter, &mut riter).unwrap();
 
         loop {
-            match chain.peek().unwrap() {
+            match chain.peek() {
                 [None, None] => {
                     break;
                 }
                 _ => {
-                    println!(
-                        "{:?}",
-                        [chain.next_left().unwrap(), chain.next_right()]
-                    );
+                    println!("{:?}", [chain.next_left(), chain.next_right()]);
                 }
             }
         }

@@ -44,3 +44,59 @@ impl Default for InfoIter {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::fuse::info::Info;
+    use crate::fuse::info_iter::{InfoIter, LineIter};
+
+    fn split(line: &str) -> LineIter {
+        line.char_indices()
+            .zip(line.char_indices().skip(1).chain(Some((line.len(), ' '))))
+            .map(move |((i, _), (j, _))| line[i..j].to_string())
+            .collect::<Vec<String>>()
+            .into_iter()
+    }
+
+    fn test(actual: InfoIter, expected: Vec<(&str, usize)>) {
+        for (act, exp) in actual.zip(expected.into_iter()) {
+            assert_eq!(act, Info::from(exp));
+        }
+    }
+
+    fn test_left(rank: usize, lines: LineIter, expected: Vec<(&str, usize)>) {
+        test(InfoIter::left(lines, rank), expected);
+    }
+
+    fn test_right(rank: usize, lines: LineIter, expected: Vec<(&str, usize)>) {
+        test(InfoIter::right(lines, rank), expected);
+    }
+
+    #[test]
+    fn case_1() {
+        test_left(
+            1,
+            split("+ -+ +- -"),
+            vec![
+                ("+", 1),
+                (" ", 2),
+                ("-", 3),
+                ("+", 3),
+                (" ", 4),
+                ("+", 5),
+                ("-", 6),
+                (" ", 6),
+                ("-", 7),
+            ],
+        );
+    }
+
+    #[test]
+    fn case_2() {
+        test_right(
+            3,
+            split("+++- "),
+            vec![("+", 3), ("+", 3), ("+", 3), ("-", 3), (" ", 4)],
+        );
+    }
+}

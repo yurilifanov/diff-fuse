@@ -1,7 +1,9 @@
+// TODO: rename to Line
+
 #[derive(Debug, PartialEq)]
 pub struct Info {
     pub line: String,
-    pub rank: usize,
+    pub rank: usize, // lineno, but with a caveat, see InfoIter
 }
 
 impl Info {
