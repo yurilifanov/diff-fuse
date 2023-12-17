@@ -12,12 +12,19 @@ pub struct InfoIter {
     kind: char,
 }
 
+fn init_line_no(header: &Header) -> LineNo {
+    let mut line_no: LineNo = (&header.fields).into();
+    line_no.nums[0] -= 1;
+    line_no.nums[1] -= 1;
+    line_no
+}
+
 impl InfoIter {
     pub fn left(lines: LineIter, header: &Header) -> InfoIter {
         let kind = '+';
         InfoIter {
             lines,
-            line_no: (&header.fields).into(),
+            line_no: init_line_no(header),
             rank: header.fields[2],
             kind,
         }
@@ -27,7 +34,7 @@ impl InfoIter {
         let kind = '-';
         InfoIter {
             lines,
-            line_no: (&header.fields).into(),
+            line_no: init_line_no(header),
             rank: header.fields[0],
             kind,
         }
@@ -39,12 +46,12 @@ impl Iterator for InfoIter {
 
     fn next(&mut self) -> Option<Info> {
         let line = self.lines.next()?;
+        self.line_no.bump(line.chars().nth(0).unwrap_or('!'));
         let info: Info =
             (line, self.line_no.clone(), self.rank.clone()).into();
         if info.line.starts_with([self.kind, ' ']) {
             self.rank += 1;
         }
-        self.line_no.bump(info.prefix());
         Some(info)
     }
 }
@@ -102,12 +109,12 @@ mod tests {
             [1, 0, 1, 0],
             split("+ -+ +- -"),
             vec![
-                ("+", [1, 1], 1),
+                ("+", [0, 1], 1),
                 (" ", [1, 2], 2),
-                ("-", [2, 3], 3),
-                ("+", [3, 4], 3),
-                (" ", [3, 5], 4),
-                ("+", [4, 6], 5),
+                ("-", [2, 2], 3),
+                ("+", [2, 3], 3),
+                (" ", [3, 4], 4),
+                ("+", [3, 5], 5),
                 ("-", [4, 5], 6),
                 (" ", [5, 6], 6),
                 ("-", [6, 6], 7),
@@ -121,11 +128,11 @@ mod tests {
             [3, 0, 3, 0],
             split("+++- "),
             vec![
-                ("+", [3, 3], 3),
-                ("+", [3, 4], 3),
-                ("+", [3, 5], 3),
-                ("-", [4, 5], 3),
-                (" ", [5, 6], 4),
+                ("+", [2, 3], 3),
+                ("+", [2, 4], 3),
+                ("+", [2, 5], 3),
+                ("-", [3, 5], 3),
+                (" ", [4, 6], 4),
             ],
         );
     }

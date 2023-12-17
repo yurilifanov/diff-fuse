@@ -180,8 +180,7 @@ fn sort(
     // - keep the order of lines according to their index
     // - keep the group order according to the group index
     data.sort_unstable_by(
-        |((lhs_group, lhs_index), (linfo)),
-         ((rhs_group, rhs_index), (rinfo))| {
+        |((lhs_group, lhs_index), linfo), ((rhs_group, rhs_index), rinfo)| {
             if lhs_group != rhs_group {
                 return lhs_group.cmp(rhs_group);
             }
