@@ -9,6 +9,70 @@ use std::iter::Peekable;
 
 pub type HunkIter = std::vec::IntoIter<Hunk>;
 
+struct Chain<'a, const T: char> {
+    hunk_iter: &'a mut Peekable<HunkIter>,
+    info_iter: Peekable<InfoIter>,
+}
+
+impl<'a, const T: char> Chain<'_, T> {
+    pub fn new(mut hunk_iter: &'a mut Peekable<HunkIter>) -> Chain<'a, T> {
+        let info_iter = match hunk_iter.next() {
+            None => InfoIter::default().peekable(),
+            Some(hunk) => {
+                let (header, lines) = hunk.unpack();
+                let iter = match T {
+                    'L' => InfoIter::left(lines, &header),
+                    _ => InfoIter::right(lines, &header),
+                };
+                iter.peekable()
+            }
+        };
+
+        Chain {
+            hunk_iter,
+            info_iter,
+        }
+    }
+
+    pub fn peek(&mut self, header: &Header) -> Option<&Info> {
+        loop {
+            if self.info_iter.peek().is_some() {
+                return self.info_iter.peek();
+            } else if let Some(peek) = self.hunk_iter.peek() {
+                match T {
+                    'L' => {
+                        if !peek.header().overlaps(header) {
+                            return None;
+                        }
+                    }
+                    _ => {
+                        if !header.overlaps(peek.header()) {
+                            return None;
+                        }
+                    }
+                }
+
+                let (header, lines) = self.hunk_iter.next().unwrap().unpack();
+                self.info_iter = match T {
+                    'L' => InfoIter::left(lines, &header),
+                    _ => InfoIter::right(lines, &header),
+                }
+                .peekable();
+            } else {
+                return None;
+            }
+        }
+    }
+
+    pub fn next(&mut self, header: &Header) -> Option<Info> {
+        if self.peek(header).is_some() {
+            self.info_iter.next()
+        } else {
+            None
+        }
+    }
+}
+
 pub struct InfoChain<'a> {
     lhunks: &'a mut Peekable<HunkIter>,
     rhunks: &'a mut Peekable<HunkIter>,
@@ -161,5 +225,9 @@ impl<'a> InfoSource for InfoChain<'_> {
                 return None;
             }
         }
+    }
+
+    fn update_header(&mut self, lincrement: i64, rincrement: i64) {
+        todo!()
     }
 }
