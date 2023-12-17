@@ -51,7 +51,6 @@ impl<'a, const T: char> Chain<'_, T> {
             if self.info_iter.peek().is_some() {
                 return self.info_iter.peek();
             } else if let Some(peek) = self.hunk_iter.peek() {
-                println!("{T} -- {header} vs {}", peek.header());
                 match T {
                     'L' => {
                         if !peek.header().overlaps(header) {
@@ -117,9 +116,7 @@ impl<'a> InfoSource for InfoChain<'_> {
     fn peek(&mut self) -> [Option<&Info>; 2] {
         let lhdr = self.lchain.header();
         let rhdr = self.rchain.header();
-        let tmp = [self.lchain.peek(&lhdr), self.rchain.peek(&rhdr)];
-        println!("Chain peek: {tmp:?}");
-        tmp
+        [self.lchain.peek(&rhdr), self.rchain.peek(&lhdr)]
     }
 
     fn next_left(&mut self) -> Option<Info> {
