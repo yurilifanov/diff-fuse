@@ -4,15 +4,15 @@ use crate::error::MergeError;
 use crate::macros::merge_err;
 
 pub struct LineCounter {
-    num_added: usize,
-    num_removed: usize,
-    total_added: usize,
-    total_removed: usize,
-    total_unchanged: usize,
+    num_added: i64,
+    num_removed: i64,
+    total_added: i64,
+    total_removed: i64,
+    total_unchanged: i64,
 }
 
-impl LineCounter {
-    pub fn new() -> LineCounter {
+impl Default for LineCounter {
+    fn default() -> LineCounter {
         LineCounter {
             num_added: 0,
             num_removed: 0,
@@ -21,11 +21,10 @@ impl LineCounter {
             total_unchanged: 0,
         }
     }
+}
 
-    pub fn update(
-        &mut self,
-        info: &Info,
-    ) -> Result<(usize, usize), MergeError> {
+impl LineCounter {
+    pub fn update(&mut self, info: &Info) -> Result<(i64, i64), MergeError> {
         match info.prefix() {
             '-' => {
                 self.num_removed += 1;
@@ -50,7 +49,7 @@ impl LineCounter {
         }
     }
 
-    pub fn header_fields(&self) -> (usize, usize) {
+    pub fn header_fields(&self) -> (i64, i64) {
         (
             self.total_removed + self.total_unchanged,
             self.total_added + self.total_unchanged,

@@ -1,32 +1,29 @@
-pub mod handed;
 pub mod header;
 mod info_source;
 
+pub use header::Header;
+
 use crate::error::{MergeError, ParseError};
 use crate::fuse::core::fuse;
-use crate::hand::Hand;
-use crate::info::{iter_info, Info};
 use crate::macros::{merge_err, parse_err};
-use crate::merge::Merge;
+
 use core::cmp::{min, Ordering};
-use std::iter::{repeat, Peekable};
+use std::iter::Peekable;
 
 #[derive(Clone, Debug)]
 pub struct Hunk {
     _lines: Vec<String>,
-    _header: [usize; 4],
+    _header: Header,
 }
 
 impl Hunk {
-    pub fn new(_header: [usize; 4], mut _lines: Vec<String>) -> Hunk {
-        _lines.insert(0, header::dump(&_header));
+    pub fn new(_header: Header, mut _lines: Vec<String>) -> Hunk {
+        _lines.insert(0, _header.to_string());
         Hunk { _header, _lines }
     }
 
     pub fn cmp(&self, other: &Hunk) -> Ordering {
-        let [lhs_mmin, _, lhs_pmin, _] = self._header;
-        let [rhs_mmin, _, rhs_pmin, _] = other._header;
-        min(lhs_mmin, lhs_pmin).cmp(min(&rhs_mmin, &rhs_pmin))
+        self._header.cmp(&other._header)
     }
 
     pub fn from_lines<'a, T: Iterator<Item = &'a str>>(
@@ -37,11 +34,11 @@ impl Hunk {
                 return Err(parse_err!("Expected hunk header, got '{line}'"));
             }
 
-            let _header = header::parse(line)?;
+            let _header = Header::parse(line)?;
             let mut _lines: Vec<String> = vec![line.to_string()];
             lines.next();
 
-            let mut counts: (usize, usize) = (0, 0);
+            let mut counts: (i64, i64) = (0, 0);
             while let Some(line) = lines.peek() {
                 match line.chars().nth(0).unwrap_or('!') {
                     '-' => {
@@ -62,7 +59,7 @@ impl Hunk {
                 lines.next();
             }
 
-            if counts.0 != _header[1] || counts.1 != _header[3] {
+            if counts.0 != _header.fields[1] || counts.1 != _header.fields[3] {
                 return Err(parse_err!(
                     "Hunk validation failed: line count = {:?}, header = {:?}",
                     counts,
@@ -76,7 +73,7 @@ impl Hunk {
         }
     }
 
-    pub fn header(&self) -> &[usize; 4] {
+    pub fn header(&self) -> &Header {
         &self._header
     }
 
@@ -84,40 +81,20 @@ impl Hunk {
         &self._lines
     }
 
-    pub fn unpack(self) -> ([usize; 4], std::vec::IntoIter<String>) {
+    pub fn unpack(self) -> (Header, std::vec::IntoIter<String>) {
         let mut lines = self._lines.into_iter();
         lines.next();
         (self._header, lines)
     }
 
-    pub fn into_data(mut self) -> ([usize; 4], impl Iterator<Item = String>) {
-        (self._header, self._lines.into_iter().skip(1))
-    }
-
     pub fn overlaps(&self, other: &Hunk) -> bool {
-        header::overlap(&self._header, &other._header)
+        self._header.overlaps(&other._header)
     }
 
     pub fn with_offset(self, offset: i64) -> Result<Hunk, MergeError> {
-        let mut _header = self._header;
+        let _header = self._header.with_offset(offset)?;
         let mut _lines = self._lines;
-        let abs: usize = offset
-            .abs()
-            .try_into()
-            .map_err(|_| merge_err!("Could not convert {offset} to usize"))?;
-
-        _header[2] = if offset < 0 {
-            if _header[2] < abs {
-                return Err(merge_err!(
-                    "Tried to offset hunk {_header:?} by {offset}"
-                ));
-            }
-            _header[2] - abs
-        } else {
-            _header[2] + abs
-        };
-
-        _lines[0] = header::dump(&_header);
+        _lines[0] = _header.to_string();
         Ok(Hunk { _header, _lines })
     }
 
@@ -135,23 +112,6 @@ impl Hunk {
         num_added - num_removed
     }
 
-    pub fn into_lines(mut self) -> std::vec::IntoIter<String> {
-        self._lines.into_iter()
-    }
-
-    pub fn into_info(
-        self,
-        hand: Hand,
-    ) -> ([usize; 4], impl Iterator<Item = Info>) {
-        let (header, lines) = self.into_data();
-        (header, iter_info(&header, repeat(hand).zip(lines)))
-    }
-
-    // FIXME: header should be a struct with a pub fn for this
-    pub fn fuse_header(&self, other: &Hunk) -> [usize; 4] {
-        header::fuse(&self._header, &other._header)
-    }
-
     pub fn fuse(mut self, other: Hunk) -> Result<Hunk, MergeError> {
         if !self.overlaps(&other) {
             return Err(merge_err!(
@@ -166,30 +126,8 @@ impl Hunk {
         }
 
         fuse(
-            header::fuse(&self._header, &other._header),
+            self._header.fuse(&other._header),
             info_source::InfoSource::new(self, other),
-        )
-    }
-
-    pub fn merge<'a>(mut self, other: Hunk) -> Result<Merge, MergeError> {
-        if !self.overlaps(&other) {
-            return Err(merge_err!(
-                "Expected hunks {:?} and {:?} to overlap, but they do not",
-                self._header,
-                other._header
-            ));
-        }
-        Merge::new(
-            &self._header,
-            iter_info(
-                &self._header,
-                repeat(Hand::Left).zip(self._lines.into_iter().skip(1)),
-            ),
-            &other._header,
-            iter_info(
-                &other._header,
-                repeat(Hand::Right).zip(other._lines.into_iter().skip(1)),
-            ),
         )
     }
 }

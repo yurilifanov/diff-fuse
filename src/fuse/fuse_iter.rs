@@ -81,7 +81,7 @@ fn fuse_overlapping(
     rhunks: &mut Peekable<HunkIter>,
 ) -> Result<Hunk, MergeError> {
     let header = if let (Some(l), Some(r)) = (lhunks.peek(), rhunks.peek()) {
-        l.fuse_header(r)
+        l.header().fuse(r.header())
     } else {
         return Err(merge_err!("fuse_overlapping: peek returned None"));
     };

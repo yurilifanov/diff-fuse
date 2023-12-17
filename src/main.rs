@@ -2,14 +2,11 @@ mod diff;
 mod error;
 mod file_diff;
 pub mod fuse;
-mod hand;
 mod header;
 mod hunk;
-mod info;
 mod input;
 mod line_no;
 mod macros;
-mod merge;
 
 use diff::Diff;
 

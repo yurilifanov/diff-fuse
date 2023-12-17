@@ -3,12 +3,11 @@ use crate::fuse::info_iter::InfoIter;
 use crate::fuse::info_source::InfoSource;
 
 use crate::error::MergeError;
-use crate::hunk::{header, Hunk};
+use crate::hunk::{Header, Hunk};
 use crate::macros::merge_err;
 use std::iter::Peekable;
 
 pub type HunkIter = std::vec::IntoIter<Hunk>;
-type Header = [usize; 4];
 
 pub struct InfoChain<'a> {
     lhunks: &'a mut Peekable<HunkIter>,
@@ -25,7 +24,7 @@ impl<'a> InfoChain<'_> {
         mut rhunks: &'a mut Peekable<HunkIter>,
     ) -> Result<InfoChain<'a>, MergeError> {
         let (lheader, linfo) = match lhunks.next() {
-            None => ([0usize, 0, 0, 0], InfoIter::default().peekable()),
+            None => (Header::default(), InfoIter::default().peekable()),
             Some(hunk) => {
                 let (header, lines) = hunk.unpack();
                 let iter = InfoIter::left(lines, &header).peekable();
@@ -34,7 +33,7 @@ impl<'a> InfoChain<'_> {
         };
 
         let (rheader, rinfo) = match rhunks.next() {
-            None => ([0usize, 0, 0, 0], InfoIter::default().peekable()),
+            None => (Header::default(), InfoIter::default().peekable()),
             Some(hunk) => {
                 let (header, lines) = hunk.unpack();
                 let iter = InfoIter::right(lines, &header).peekable();
@@ -62,7 +61,7 @@ impl<'a> InfoChain<'_> {
             if info_iter.peek().is_some() {
                 return (header_out, info_iter.peek());
             } else if let Some(peek) = hunk_iter.peek() {
-                if !header::overlap(header_in, peek.header()) {
+                if !header_in.overlaps(peek.header()) {
                     return (None, None);
                 }
                 let (header, lines) = hunk_iter.next().unwrap().unpack();
@@ -85,7 +84,7 @@ impl<'a> InfoChain<'_> {
             if info_iter.peek().is_some() {
                 return (header_out, info_iter.peek());
             } else if let Some(peek) = hunk_iter.peek() {
-                if !header::overlap(peek.header(), header_in) {
+                if !peek.header().overlaps(header_in) {
                     return (None, None);
                 }
                 let (header, lines) = hunk_iter.next().unwrap().unpack();
@@ -133,7 +132,7 @@ impl<'a> InfoSource for InfoChain<'_> {
             if let Some(info) = self.linfo.next() {
                 return Some(info);
             } else if let Some(peek) = self.lhunks.peek() {
-                if !header::overlap(peek.header(), &self.rheader) {
+                if !peek.header().overlaps(&self.rheader) {
                     return None;
                 }
                 let (header, lines) = self.lhunks.next()?.unpack();
@@ -151,7 +150,7 @@ impl<'a> InfoSource for InfoChain<'_> {
             if let Some(info) = self.rinfo.next() {
                 return Some(info);
             } else if let Some(peek) = self.rhunks.peek() {
-                if !header::overlap(&self.lheader, peek.header()) {
+                if !self.lheader.overlaps(peek.header()) {
                     return None;
                 }
                 let (header, lines) = self.rhunks.next()?.unpack();

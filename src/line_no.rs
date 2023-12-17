@@ -1,10 +1,10 @@
 #[derive(Clone, Debug, PartialEq)]
 pub struct LineNo {
-    pub nums: [usize; 2],
+    pub nums: [i64; 2],
 }
 
 impl LineNo {
-    pub fn new(left: usize, right: usize) -> LineNo {
+    pub fn new(left: i64, right: i64) -> LineNo {
         LineNo {
             nums: [left, right],
         }
@@ -27,14 +27,14 @@ impl LineNo {
     }
 }
 
-impl From<&[usize; 4]> for LineNo {
-    fn from(header: &[usize; 4]) -> LineNo {
+impl From<&[i64; 4]> for LineNo {
+    fn from(header: &[i64; 4]) -> LineNo {
         LineNo::new(header[0], header[2])
     }
 }
 
-impl From<[usize; 2]> for LineNo {
-    fn from(nums: [usize; 2]) -> LineNo {
+impl From<[i64; 2]> for LineNo {
+    fn from(nums: [i64; 2]) -> LineNo {
         LineNo { nums }
     }
 }

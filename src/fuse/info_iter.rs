@@ -1,34 +1,34 @@
 use crate::fuse::info::Info;
 use crate::line_no::LineNo;
 
-use crate::hunk::Hunk;
+use crate::hunk::{Header, Hunk};
 
 type LineIter = std::vec::IntoIter<String>;
 
 pub struct InfoIter {
     lines: LineIter,
     line_no: LineNo,
-    rank: usize,
+    rank: i64,
     kind: char,
 }
 
 impl InfoIter {
-    pub fn left(lines: LineIter, header: &[usize; 4]) -> InfoIter {
+    pub fn left(lines: LineIter, header: &Header) -> InfoIter {
         let kind = '+';
         InfoIter {
             lines,
-            line_no: header.into(),
-            rank: header[2],
+            line_no: (&header.fields).into(),
+            rank: header.fields[2],
             kind,
         }
     }
 
-    pub fn right(lines: LineIter, header: &[usize; 4]) -> InfoIter {
+    pub fn right(lines: LineIter, header: &Header) -> InfoIter {
         let kind = '-';
         InfoIter {
             lines,
-            line_no: header.into(),
-            rank: header[0],
+            line_no: (&header.fields).into(),
+            rank: header.fields[0],
             kind,
         }
     }
@@ -74,26 +74,26 @@ mod tests {
             .into_iter()
     }
 
-    fn test(actual: InfoIter, expected: Vec<(&str, [usize; 2], usize)>) {
+    fn test(actual: InfoIter, expected: Vec<(&str, [i64; 2], i64)>) {
         for (act, exp) in actual.zip(expected.into_iter()) {
             assert_eq!(act, Info::from(exp));
         }
     }
 
     fn test_left(
-        header: [usize; 4],
+        header: [i64; 4],
         lines: LineIter,
-        expected: Vec<(&str, [usize; 2], usize)>,
+        expected: Vec<(&str, [i64; 2], i64)>,
     ) {
-        test(InfoIter::left(lines, &header), expected);
+        test(InfoIter::left(lines, &header.into()), expected);
     }
 
     fn test_right(
-        header: [usize; 4],
+        header: [i64; 4],
         lines: LineIter,
-        expected: Vec<(&str, [usize; 2], usize)>,
+        expected: Vec<(&str, [i64; 2], i64)>,
     ) {
-        test(InfoIter::right(lines, &header), expected);
+        test(InfoIter::right(lines, &header.into()), expected);
     }
 
     #[test]

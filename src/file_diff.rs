@@ -1,8 +1,5 @@
-pub mod merge_iter;
-
 use crate::error::{MergeError, ParseError};
 use crate::fuse::fuse_iter::fuse_iter;
-use crate::hand::Hand;
 use crate::header::Header;
 use crate::hunk::Hunk;
 use crate::macros::{debugln, merge_err, parse_err};
@@ -105,36 +102,6 @@ impl FileDiff {
         let mut _num_lines = self._header.lines().len();
 
         for item in fuse_iter(self._hunks, other._hunks) {
-            let hunk = item?;
-            _num_lines += hunk.lines().len();
-            hunks.push(hunk);
-        }
-
-        Ok(FileDiff {
-            _header: self._header.clone(),
-            _hunks: hunks,
-            _num_lines,
-        })
-    }
-
-    pub fn merge(mut self, other: FileDiff) -> Result<FileDiff, MergeError> {
-        let (lhs_file, rhs_file) =
-            (self._header.file_name(), other._header.file_name());
-        if lhs_file != rhs_file {
-            return Err(merge_err!(
-                "File names {lhs_file} and {rhs_file} do not match"
-            ));
-        }
-
-        debugln!("Merging {lhs_file}");
-        let merge_iter = merge_iter::merge_iter(
-            self._hunks.into_iter().peekable(),
-            other._hunks.into_iter().peekable(),
-        );
-
-        let mut hunks: Vec<Hunk> = Vec::new();
-        let mut _num_lines = self._header.lines().len();
-        for item in merge_iter {
             let hunk = item?;
             _num_lines += hunk.lines().len();
             hunks.push(hunk);

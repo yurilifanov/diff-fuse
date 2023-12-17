@@ -5,7 +5,7 @@ use crate::line_no::LineNo;
 pub struct Info {
     pub line: String,
     pub line_no: LineNo,
-    pub rank: usize, // lineno, but with a caveat, see InfoIter
+    pub rank: i64, // lineno, but with a caveat, see InfoIter
 }
 
 impl Info {
@@ -14,8 +14,8 @@ impl Info {
     }
 }
 
-impl From<(String, LineNo, usize)> for Info {
-    fn from(tuple: (String, LineNo, usize)) -> Info {
+impl From<(String, LineNo, i64)> for Info {
+    fn from(tuple: (String, LineNo, i64)) -> Info {
         let (line, line_no, rank) = tuple;
         Info {
             line,
@@ -25,15 +25,15 @@ impl From<(String, LineNo, usize)> for Info {
     }
 }
 
-impl From<(&str, LineNo, usize)> for Info {
-    fn from(tuple: (&str, LineNo, usize)) -> Info {
+impl From<(&str, LineNo, i64)> for Info {
+    fn from(tuple: (&str, LineNo, i64)) -> Info {
         let (line, line_no, rank) = tuple;
         (line.to_string(), line_no, rank).into()
     }
 }
 
-impl From<(&str, [usize; 2], usize)> for Info {
-    fn from(tuple: (&str, [usize; 2], usize)) -> Info {
+impl From<(&str, [i64; 2], i64)> for Info {
+    fn from(tuple: (&str, [i64; 2], i64)) -> Info {
         let (line, line_no, rank) = tuple;
         (line.to_string(), line_no.into(), rank).into()
     }

@@ -4,17 +4,17 @@ use crate::fuse::info_source::InfoSource;
 use crate::fuse::line_counter::LineCounter;
 
 use crate::error::MergeError;
-use crate::hunk::Hunk;
+use crate::hunk::{Header, Hunk};
 use crate::macros::merge_err;
 
 use core::cmp::Ordering;
 
 pub fn fuse<T: InfoSource>(
-    mut header: [usize; 4],
+    mut header: Header,
     mut source: T,
 ) -> Result<Hunk, MergeError> {
-    let mut counter = LineCounter::new();
-    let mut data: Vec<((usize, usize), Info)> = Vec::new();
+    let mut counter = LineCounter::default();
+    let mut data: Vec<((i64, i64), Info)> = Vec::new();
     let mut drain = Drain::<T> { source };
 
     while let Some(item) = drain.next() {
@@ -31,8 +31,8 @@ pub fn fuse<T: InfoSource>(
     }
 
     let fields = counter.header_fields();
-    header[1] = fields.0;
-    header[3] = fields.1;
+    header.fields[1] = fields.0;
+    header.fields[3] = fields.1;
 
     Ok(Hunk::new(
         header,
@@ -163,8 +163,8 @@ impl<T: InfoSource> Drain<T> {
 }
 
 fn sort(
-    mut data: Vec<((usize, usize), Info)>,
-) -> Result<Vec<((usize, usize), Info)>, MergeError> {
+    mut data: Vec<((i64, i64), Info)>,
+) -> Result<Vec<((i64, i64), Info)>, MergeError> {
     let mut err: Option<MergeError> = None;
     let mut update_err = |e: MergeError| {
         if err.is_none() {
