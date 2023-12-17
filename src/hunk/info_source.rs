@@ -34,6 +34,4 @@ impl Trait for InfoSource {
     fn next_left(&mut self) -> Option<Info> {
         self.left.next()
     }
-
-    fn update_header(&mut self, lincrement: i64, rincrement: i64) {}
 }
