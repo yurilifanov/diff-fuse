@@ -7,5 +7,6 @@ mod hand;
 mod header;
 mod hunk;
 mod info;
+mod line_no;
 mod macros;
 mod merge;

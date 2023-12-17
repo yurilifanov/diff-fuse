@@ -28,7 +28,8 @@ impl<'a> InfoChain<'_> {
             None => ([0usize, 0, 0, 0], InfoIter::default().peekable()),
             Some(hunk) => {
                 let (header, lines) = hunk.unpack();
-                (header, InfoIter::left(lines, header[2]).peekable())
+                let iter = InfoIter::left(lines, &header).peekable();
+                (header, iter)
             }
         };
 
@@ -36,8 +37,8 @@ impl<'a> InfoChain<'_> {
             None => ([0usize, 0, 0, 0], InfoIter::default().peekable()),
             Some(hunk) => {
                 let (header, lines) = hunk.unpack();
-                let rank = header[0];
-                (header, InfoIter::right(lines, rank).peekable())
+                let iter = InfoIter::right(lines, &header).peekable();
+                (header, iter)
             }
         };
 
@@ -65,7 +66,7 @@ impl<'a> InfoChain<'_> {
                     return (None, None);
                 }
                 let (header, lines) = hunk_iter.next().unwrap().unpack();
-                let info = InfoIter::right(lines, header[0]);
+                let info = InfoIter::right(lines, &header);
                 header_out = Some(header);
                 *info_iter = info.peekable();
             } else {
@@ -88,7 +89,7 @@ impl<'a> InfoChain<'_> {
                     return (None, None);
                 }
                 let (header, lines) = hunk_iter.next().unwrap().unpack();
-                let info = InfoIter::left(lines, header[2]);
+                let info = InfoIter::left(lines, &header);
                 header_out = Some(header);
                 *info_iter = info.peekable();
             } else {
@@ -136,7 +137,7 @@ impl<'a> InfoSource for InfoChain<'_> {
                     return None;
                 }
                 let (header, lines) = self.lhunks.next()?.unpack();
-                let info = InfoIter::left(lines, header[2]);
+                let info = InfoIter::left(lines, &header);
                 self.lheader = header;
                 self.linfo = info.peekable();
             } else {
@@ -154,7 +155,7 @@ impl<'a> InfoSource for InfoChain<'_> {
                     return None;
                 }
                 let (header, lines) = self.rhunks.next()?.unpack();
-                let info = InfoIter::right(lines, header[0]);
+                let info = InfoIter::right(lines, &header);
                 self.rheader = header;
                 self.rinfo = info.peekable();
             } else {

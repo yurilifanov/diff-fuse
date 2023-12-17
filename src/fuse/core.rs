@@ -40,6 +40,7 @@ pub fn fuse<T: InfoSource>(
     ))
 }
 
+// TODO: this should just be an array [Option<Info>; 2]
 enum FuseItem {
     None,
     Single(Info),

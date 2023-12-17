@@ -1,8 +1,10 @@
 // TODO: rename to Line
+use crate::line_no::LineNo;
 
 #[derive(Debug, PartialEq)]
 pub struct Info {
     pub line: String,
+    pub line_no: LineNo,
     pub rank: usize, // lineno, but with a caveat, see InfoIter
 }
 
@@ -12,20 +14,27 @@ impl Info {
     }
 }
 
-impl From<(&str, usize)> for Info {
-    fn from(tuple: (&str, usize)) -> Info {
+impl From<(String, LineNo, usize)> for Info {
+    fn from(tuple: (String, LineNo, usize)) -> Info {
+        let (line, line_no, rank) = tuple;
         Info {
-            line: tuple.0.to_string(),
-            rank: tuple.1,
+            line,
+            line_no,
+            rank,
         }
     }
 }
 
-impl From<(String, usize)> for Info {
-    fn from(tuple: (String, usize)) -> Info {
-        Info {
-            line: tuple.0,
-            rank: tuple.1,
-        }
+impl From<(&str, LineNo, usize)> for Info {
+    fn from(tuple: (&str, LineNo, usize)) -> Info {
+        let (line, line_no, rank) = tuple;
+        (line.to_string(), line_no, rank).into()
+    }
+}
+
+impl From<(&str, [usize; 2], usize)> for Info {
+    fn from(tuple: (&str, [usize; 2], usize)) -> Info {
+        let (line, line_no, rank) = tuple;
+        (line.to_string(), line_no.into(), rank).into()
     }
 }

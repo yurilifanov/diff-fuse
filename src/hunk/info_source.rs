@@ -16,8 +16,8 @@ impl InfoSource {
         let (lheader, llines) = left.unpack();
         let (rheader, rlines) = right.unpack();
         InfoSource {
-            left: InfoIter::left(llines, lheader[2]).peekable(),
-            right: InfoIter::right(rlines, rheader[0]).peekable(),
+            left: InfoIter::left(llines, &lheader).peekable(),
+            right: InfoIter::right(rlines, &rheader).peekable(),
         }
     }
 }
