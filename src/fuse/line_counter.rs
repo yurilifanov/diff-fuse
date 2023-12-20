@@ -1,6 +1,6 @@
-use crate::fuse::info::Info;
-
 use crate::error::MergeError;
+use crate::fuse::info::Info;
+use crate::hunk::Header;
 use crate::macros::merge_err;
 
 pub struct LineCounter {
@@ -49,10 +49,22 @@ impl LineCounter {
         }
     }
 
-    pub fn header_fields(&self) -> (i64, i64) {
-        (
-            self.total_removed + self.total_unchanged,
-            self.total_added + self.total_unchanged,
-        )
+    pub fn update_header(&self, header: &mut Header) {
+        header.fields[1] = self.total_removed + self.total_unchanged;
+        header.fields[3] = self.total_added + self.total_unchanged;
+
+        match [header.fields[1], header.fields[3]] {
+            [0, 0] => {
+                header.fields[0] = 0;
+                header.fields[2] = 0;
+            }
+            [_, 0] => {
+                header.fields[2] = header.fields[0] - 1;
+            }
+            [0, _] => {
+                header.fields[0] = header.fields[2] - 1;
+            }
+            _ => {}
+        }
     }
 }

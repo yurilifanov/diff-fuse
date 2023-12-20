@@ -39,8 +39,6 @@ impl<'a, const T: char> Chain<'_, T> {
     pub fn header(&mut self) -> Header {
         if self.info_iter.peek().is_some() {
             self.header.clone()
-        } else if let Some(hunk) = self.hunk_iter.peek() {
-            hunk.header().clone()
         } else {
             Header::default()
         }
@@ -53,12 +51,12 @@ impl<'a, const T: char> Chain<'_, T> {
             } else if let Some(peek) = self.hunk_iter.peek() {
                 match T {
                     'L' => {
-                        if !peek.header().overlaps(header) {
+                        if !peek.header().should_fuse(header) {
                             return None;
                         }
                     }
                     _ => {
-                        if !header.overlaps(peek.header()) {
+                        if !header.should_fuse(peek.header()) {
                             return None;
                         }
                     }

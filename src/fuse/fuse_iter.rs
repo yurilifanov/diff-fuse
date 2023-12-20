@@ -50,7 +50,7 @@ pub fn fuse_iter(
                 Some(liter.next()?.with_offset(offset))
             }
             [Some(lhs), Some(rhs)] => {
-                if !lhs.overlaps(rhs) {
+                if !lhs.header().should_fuse(rhs.header()) {
                     if lhs.cmp(rhs) == Ordering::Less {
                         debugln!(
                             "fuse_iter: left -- {lhs}, offset -- {offset}"

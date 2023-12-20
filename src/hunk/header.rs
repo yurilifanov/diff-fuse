@@ -75,31 +75,21 @@ impl Header {
     }
 
     pub fn fuse(&self, other: &Header) -> Header {
-        [
-            min(self.fields[0], other.fields[0]),
-            0,
-            min(self.fields[2], other.fields[2]),
-            0,
-        ]
-        .into()
-    }
+        let left = match [self.fields[1], other.fields[1]] {
+            [0, 0] => min(self.fields[0], other.fields[0] - self.offset()),
+            [_, 0] => self.fields[0],
+            [0, _] => other.fields[0],
+            _ => min(self.fields[0], other.fields[0] - self.offset()),
+        };
 
-    pub fn contains(&self, line_no: &LineNo) -> bool {
-        let [min, max] = self.minus_range();
-        for num in line_no.nums {
-            if num >= min && num < max {
-                return true;
-            }
-        }
+        let right = match [self.fields[3], other.fields[3]] {
+            [0, 0] => min(self.fields[2] + other.offset(), other.fields[2]),
+            [_, 0] => self.fields[2],
+            [0, _] => other.fields[2],
+            _ => min(self.fields[2] + other.offset(), other.fields[2]),
+        };
 
-        let [min, max] = self.plus_range();
-        for num in line_no.nums {
-            if num >= min && num < max {
-                return true;
-            }
-        }
-
-        return false;
+        [left, 0, right, 0].into()
     }
 
     pub fn overlaps(&self, other: &Header) -> bool {
@@ -119,14 +109,14 @@ impl Header {
         false
     }
 
+    pub fn should_fuse(&self, other: &Header) -> bool {
+        let [lhs_min, lhs_max] = other.minus_range();
+        let [rhs_min, rhs_max] = self.plus_range();
+        lhs_min < rhs_max && rhs_min < lhs_max
+    }
+
     pub fn to_string(&self) -> String {
         let [mut mmin, mnum, mut pmin, pnum] = self.fields;
-        if mnum == 0 {
-            mmin = 0;
-        }
-        if pnum == 0 {
-            pmin = 0;
-        }
         match [mnum, pnum] {
             [1, 1] => format!("@@ -{mmin} +{pmin} @@"),
             [_, 1] => format!("@@ -{mmin},{mnum} +{pmin} @@"),
@@ -144,6 +134,16 @@ impl Header {
         }
         self.fields[2] = field;
         Ok(self)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.fields[1] == 0 && self.fields[3] == 0
+    }
+
+    fn offset(&self) -> i64 {
+        // how many lines were added before this hunk
+        (self.fields[2] + if self.fields[3] == 0 { 1 } else { 0 })
+            - (self.fields[0] + if self.fields[1] == 0 { 1 } else { 0 })
     }
 
     fn minus_range(&self) -> [i64; 2] {

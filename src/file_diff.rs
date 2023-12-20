@@ -2,7 +2,7 @@ use crate::error::{MergeError, ParseError};
 use crate::fuse::fuse_iter::fuse_iter;
 use crate::header::Header;
 use crate::hunk::Hunk;
-use crate::macros::{debugln, merge_err, parse_err};
+use crate::macros::{debugln, merge_err, parse_err, warnln};
 use core::cmp::Ordering;
 use std::iter::Peekable;
 use std::slice::Iter;
@@ -103,6 +103,14 @@ impl FileDiff {
 
         for item in fuse_iter(self._hunks, other._hunks) {
             let hunk = item?;
+
+            if hunk.header().is_empty() {
+                if hunk.lines().len() != 0 {
+                    warnln!("FileDiff::fuse -- Empty hunk with lines");
+                }
+                continue;
+            }
+
             _num_lines += hunk.lines().len();
             hunks.push(hunk);
         }
@@ -365,6 +373,46 @@ Index: text.txt
 @@ -9 +8 @@
 -8
 +viii
+",
+        );
+    }
+
+    #[test]
+    fn case_6() {
+        test(
+            "\
+Index: text.txt
+===================================================================
+--- text.txt
++++ text.txt
+@@ -1,3 +1,0 @@
+-1
+-2
+-3
+@@ -9 +6,2 @@
+ 9
++x
+",
+            "\
+Index: text.txt
+===================================================================
+--- text.txt
++++ text.txt
+@@ -6 +5,0 @@
+-9
+",
+            "\
+Index: text.txt
+===================================================================
+--- text.txt
++++ text.txt
+@@ -1,3 +1,0 @@
+-1
+-2
+-3
+@@ -9 +6 @@
+-9
++x
 ",
         );
     }

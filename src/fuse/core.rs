@@ -30,9 +30,7 @@ pub fn fuse<T: InfoSource>(
         }
     }
 
-    let fields = counter.header_fields();
-    header.fields[1] = fields.0;
-    header.fields[3] = fields.1;
+    counter.update_header(&mut header);
 
     Ok(Hunk::new(
         header,

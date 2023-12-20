@@ -113,7 +113,7 @@ impl Hunk {
     }
 
     pub fn fuse(mut self, other: Hunk) -> Result<Hunk, MergeError> {
-        if !self.overlaps(&other) {
+        if !self.header().should_fuse(other.header()) {
             return Err(merge_err!(
                 "Expected hunks {} and {} to overlap, but they do not",
                 self,
@@ -121,9 +121,9 @@ impl Hunk {
             ));
         }
 
-        if self.cmp(&other) == Ordering::Less {
-            self = self.with_offset(other.offset())?;
-        }
+        // if self.cmp(&other) == Ordering::Less {
+        //     self = self.with_offset(other.offset())?;
+        // }
 
         fuse(
             self._header.fuse(&other._header),
@@ -225,7 +225,7 @@ mod tests {
     fn case_3() {
         test(
             "\
-@@ -3,1 +3,1 @@
+@@ -3 +3 @@
 -c
 +C
 ",
@@ -248,21 +248,83 @@ mod tests {
     fn case_4() {
         test(
             "\
-@@ -0,0 +3,1 @@
+@@ -1,0 +3,1 @@
 +d
 ",
             "\
-@@ -0,0 +1,3 @@
+@@ -1,3 +1,4 @@
 +a
-+b
-+c
+ b
+ c
+ d
 ",
             "\
-@@ -0,0 +1,4 @@
+@@ -1,2 +1,4 @@
 +a
-+b
-+c
+ b
+ c
 +d
+",
+        );
+    }
+
+    #[test]
+    fn case_5() {
+        test(
+            "\
+@@ -9 +6,2 @@
+ 9
++x
+",
+            "\
+@@ -6 +5,0 @@
+-9
+",
+            "\
+@@ -9 +6 @@
+-9
++x
+",
+        );
+    }
+
+    #[test]
+    fn case_6() {
+        test(
+            "\
+@@ -9 +6,2 @@
+ 9
++x
+",
+            "\
+@@ -5,2 +5,1 @@
+ 8
+-9
+",
+            "\
+@@ -8,2 +5,2 @@
+ 8
+-9
++x
+",
+        );
+    }
+
+    #[test]
+    fn case_7() {
+        test(
+            "\
+@@ -2,0 +3,2 @@
++3
++4
+",
+            "\
+@@ -3,2 +2,0 @@
+-3
+-4
+",
+            "\
+@@ -0,0 +0,0 @@
 ",
         );
     }
