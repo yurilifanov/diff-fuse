@@ -46,7 +46,7 @@ pub fn fuse_iter(
                     (loffset, roffset)
                 );
                 roffset += rhs.offset();
-                Some(riter.next()?.with_offset(-loffset, 0))
+                Some(riter.next()?.with_offset(loffset, 0))
             }
             [Some(lhs), None] => {
                 debugln!(
@@ -71,7 +71,7 @@ pub fn fuse_iter(
                             (loffset, roffset)
                         );
                         roffset += rhs.offset();
-                        Some(riter.next()?.with_offset(-loffset, 0))
+                        Some(riter.next()?.with_offset(loffset, 0))
                     }
                 } else {
                     debugln!(
