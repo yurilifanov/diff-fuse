@@ -125,14 +125,19 @@ impl Header {
         }
     }
 
-    pub fn with_offset(mut self, offset: i64) -> Result<Header, MergeError> {
-        let field = self.fields[2] + offset;
-        if field < 0 {
+    pub fn with_offset(
+        mut self,
+        left: i64,
+        right: i64,
+    ) -> Result<Header, MergeError> {
+        self.fields[0] += left;
+        self.fields[2] += right;
+        if self.fields[0] < 0 || self.fields[2] < 0 {
             return Err(merge_err!(
-                "Tried to offset header {self} by {offset}"
+                "Tried to offset header {self} by {:?}",
+                (left, right)
             ));
         }
-        self.fields[2] = field;
         Ok(self)
     }
 

@@ -91,8 +91,12 @@ impl Hunk {
         self._header.overlaps(&other._header)
     }
 
-    pub fn with_offset(self, offset: i64) -> Result<Hunk, MergeError> {
-        let _header = self._header.with_offset(offset)?;
+    pub fn with_offset(
+        self,
+        left: i64,
+        right: i64,
+    ) -> Result<Hunk, MergeError> {
+        let _header = self._header.with_offset(left, right)?;
         let mut _lines = self._lines;
         _lines[0] = _header.to_string();
         Ok(Hunk { _header, _lines })

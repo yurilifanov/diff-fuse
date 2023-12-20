@@ -35,37 +35,53 @@ pub fn fuse_iter(
 
     let mut liter = lhunks.into_iter().peekable();
     let mut riter = rhunks.into_iter().peekable();
-    let mut offset = 0i64;
+    let mut loffset = 0i64;
+    let mut roffset = 0i64;
     std::iter::from_fn(move || -> Option<Result<Hunk, MergeError>> {
         match [liter.peek(), riter.peek()] {
             [None, None] => None,
             [None, Some(rhs)] => {
-                debugln!("fuse_iter: right -- {rhs}");
-                let hunk = riter.next()?;
-                offset += hunk.offset();
-                Some(Ok(hunk))
+                debugln!(
+                    "fuse_iter: right -- {rhs} -- {:?}",
+                    (loffset, roffset)
+                );
+                roffset += rhs.offset();
+                Some(riter.next()?.with_offset(-loffset, 0))
             }
             [Some(lhs), None] => {
-                debugln!("fuse_iter: left -- {lhs}, offset -- {offset}");
-                Some(liter.next()?.with_offset(offset))
+                debugln!(
+                    "fuse_iter: left -- {lhs} -- {:?}",
+                    (loffset, roffset)
+                );
+                loffset += lhs.offset();
+                Some(liter.next()?.with_offset(0, roffset))
             }
             [Some(lhs), Some(rhs)] => {
                 if !lhs.header().should_fuse(rhs.header()) {
                     if lhs.cmp(rhs) == Ordering::Less {
                         debugln!(
-                            "fuse_iter: left -- {lhs}, offset -- {offset}"
+                            "fuse_iter: left -- {lhs} -- {:?}",
+                            (loffset, roffset)
                         );
-                        Some(liter.next()?.with_offset(offset))
+                        loffset += lhs.offset();
+                        Some(liter.next()?.with_offset(0, roffset))
                     } else {
-                        debugln!("fuse_iter: right -- {rhs}");
-                        offset += rhs.offset();
-                        Some(Ok(riter.next()?))
+                        debugln!(
+                            "fuse_iter: right -- {rhs} -- {:?}",
+                            (loffset, roffset)
+                        );
+                        roffset += rhs.offset();
+                        Some(riter.next()?.with_offset(-loffset, 0))
                     }
                 } else {
-                    debugln!("fuse_iter: Merging {lhs} and {rhs}");
+                    debugln!(
+                        "fuse_iter: Merging {lhs} and {rhs} -- {:?}",
+                        (loffset, roffset)
+                    );
                     match fuse_overlapping(&mut liter, &mut riter) {
                         Ok(hunk) => {
-                            offset += hunk.offset();
+                            loffset += hunk.offset();
+                            roffset += hunk.offset();
                             Some(Ok(hunk))
                         }
                         err => Some(err),
