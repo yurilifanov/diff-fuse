@@ -40,11 +40,10 @@ if [ -s "$TMP_DIR"/actual.diff ]; then
     patch "$TMP_DIR"/initial.${target##*.} \
         -i "$TMP_DIR"/actual.diff \
         -o "$TMP_DIR"/result.${target##*.}
-else
-    echo "Empty diff, faking patch"
-    cp "$TMP_DIR"/final.${target##*.} "$TMP_DIR"/result.${target##*.}
-    touch "$TMP_DIR"/result.${target##*.}
-fi
 
-diff -q "$TMP_DIR"/final.${target##*.} "$TMP_DIR"/result.${target##*.}
+    diff -q "$TMP_DIR"/final.${target##*.} "$TMP_DIR"/result.${target##*.}
+else
+    echo "Empty diff, skipping patch and testing diffs"
+    diff -q "$TMP_DIR"/expected.diff "$TMP_DIR"/actual.diff
+fi
 
