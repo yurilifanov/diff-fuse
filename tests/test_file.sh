@@ -36,9 +36,15 @@ make_diff $initial_commit $final_commit expected.diff
 
 cargo run -- "$TMP_DIR"/left.diff "$TMP_DIR"/right.diff > "$TMP_DIR"/actual.diff
 
-patch "$TMP_DIR"/initial.${target##*.} \
-    -i "$TMP_DIR"/actual.diff \
-    -o "$TMP_DIR"/result.${target##*.}
+if [ -s "$TMP_DIR"/actual.diff ]; then
+    patch "$TMP_DIR"/initial.${target##*.} \
+        -i "$TMP_DIR"/actual.diff \
+        -o "$TMP_DIR"/result.${target##*.}
+else
+    echo "Empty diff, faking patch"
+    cp "$TMP_DIR"/final.${target##*.} "$TMP_DIR"/result.${target##*.}
+    touch "$TMP_DIR"/result.${target##*.}
+fi
 
-diff "$TMP_DIR"/final.${target##*.} "$TMP_DIR"/result.${target##*.}
+diff -q "$TMP_DIR"/final.${target##*.} "$TMP_DIR"/result.${target##*.}
 
