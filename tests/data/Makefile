@@ -1,5 +1,3 @@
-UNDERLINE := ===================================================================
-
 TARGETS := generate-svn/merge/success/1 generate-svn/merge/success/2
 
 all: build svn
@@ -26,23 +24,3 @@ svn:
 build:
 	podman build . -t svn
 
-
-generate-svn/merge/success/3: generate-%:
-	mkdir -p "$*"
-	git diff --no-prefix --ignore-space-at-eol HEAD~10 HEAD~5 ../../src/file_diff.rs | \
-		sed -e "s/^diff --git [^[:space:]]*/Index:/" \
-			-e "s/^index.*/$(UNDERLINE)/" \
-			-e "s/^@@\(.*\)@@.*/@@\1@@/" \
-			> "$*"/left.diff
-
-	git diff --no-prefix --ignore-space-at-eol HEAD~5 HEAD ../../src/file_diff.rs | \
-		sed -e "s/^diff --git [^[:space:]]*/Index:/" \
-			-e "s/^index.*/$(UNDERLINE)/" \
-			-e "s/^@@\(.*\)@@.*/@@\1@@/" \
-			> "$*"/right.diff
-
-	git diff --no-prefix --ignore-space-at-eol HEAD~10 HEAD ../../src/file_diff.rs | \
-		sed -e "s/^diff --git [^[:space:]]*/Index:/" \
-			-e "s/^index.*/$(UNDERLINE)/" \
-			-e "s/^@@\(.*\)@@.*/@@\1@@/" \
-			> "$*"/expected.diff
