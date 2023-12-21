@@ -6,15 +6,10 @@ pub mod info_iter;
 pub mod info_source;
 mod line_counter;
 
-use core::fuse;
-use info::Info;
-use info_chain::InfoChain;
-use info_iter::InfoIter;
-use info_source::InfoSource;
-
 #[cfg(test)]
 mod tests {
-    use crate::fuse::{InfoChain, InfoIter, InfoSource};
+    use crate::fuse::info_chain::InfoChain;
+    use crate::fuse::info_source::InfoSource;
     use crate::hunk::Hunk;
 
     #[test]

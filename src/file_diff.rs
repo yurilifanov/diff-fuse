@@ -2,10 +2,10 @@ use crate::error::{MergeError, ParseError};
 use crate::fuse::fuse_iter::fuse_iter;
 use crate::header::Header;
 use crate::hunk::Hunk;
-use crate::macros::{debugln, merge_err, parse_err, warnln};
-use core::cmp::Ordering;
-use std::iter::Peekable;
+use crate::macros::{debugln, parse_err, warnln};
 use std::slice::Iter;
+
+use std::iter::Peekable;
 
 #[derive(Debug, Clone)]
 pub struct FileDiff {
@@ -97,7 +97,7 @@ impl FileDiff {
         }
     }
 
-    pub fn fuse(mut self, other: FileDiff) -> Result<FileDiff, MergeError> {
+    pub fn fuse(self, other: FileDiff) -> Result<FileDiff, MergeError> {
         let mut hunks: Vec<Hunk> = Vec::new();
         let mut _num_lines = self._header.lines().len();
 

@@ -7,7 +7,7 @@ use crate::error::{MergeError, ParseError};
 use crate::fuse::core::fuse;
 use crate::macros::{merge_err, parse_err};
 
-use core::cmp::{min, Ordering};
+use core::cmp::Ordering;
 use std::iter::Peekable;
 
 #[derive(Clone, Debug)]
@@ -116,7 +116,7 @@ impl Hunk {
         num_added - num_removed
     }
 
-    pub fn fuse(mut self, other: Hunk) -> Result<Hunk, MergeError> {
+    pub fn fuse(self, other: Hunk) -> Result<Hunk, MergeError> {
         if !self.header().should_fuse(other.header()) {
             return Err(merge_err!(
                 "Expected hunks {} and {} to overlap, but they do not",
@@ -124,10 +124,6 @@ impl Hunk {
                 other
             ));
         }
-
-        // if self.cmp(&other) == Ordering::Less {
-        //     self = self.with_offset(other.offset())?;
-        // }
 
         fuse(
             self._header.fuse(&other._header),
@@ -148,7 +144,7 @@ impl std::fmt::Display for Hunk {
 
 #[cfg(test)]
 mod tests {
-    use crate::hunk::Hunk;
+    use super::Hunk;
 
     fn test(left: &str, right: &str, expected: &str) {
         let lhs = Hunk::from_lines(&mut left.lines().peekable());

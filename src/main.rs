@@ -1,14 +1,5 @@
-mod diff;
-mod error;
-mod file_diff;
-pub mod fuse;
-mod header;
-mod hunk;
-mod input;
-mod line_no;
-mod macros;
-
-use diff::Diff;
+use diff_fuse::diff::Diff;
+use diff_fuse::input;
 
 fn main() {
     if input::has_help_arg() {

@@ -16,7 +16,7 @@ struct Chain<'a, const T: char> {
 }
 
 impl<'a, const T: char> Chain<'_, T> {
-    pub fn new(mut hunk_iter: &'a mut Peekable<HunkIter>) -> Chain<'a, T> {
+    pub fn new(hunk_iter: &'a mut Peekable<HunkIter>) -> Chain<'a, T> {
         let (header, info_iter) = match hunk_iter.next() {
             None => (Header::default(), InfoIter::default().peekable()),
             Some(hunk) => {
@@ -94,10 +94,10 @@ pub struct InfoChain<'a> {
 
 impl<'a> InfoChain<'_> {
     pub fn new(
-        mut lhunks: &'a mut Peekable<HunkIter>,
-        mut rhunks: &'a mut Peekable<HunkIter>,
+        lhunks: &'a mut Peekable<HunkIter>,
+        rhunks: &'a mut Peekable<HunkIter>,
     ) -> Result<InfoChain<'a>, MergeError> {
-        if let [Some(lhs), Some(rhs)] = [lhunks.peek(), rhunks.peek()] {
+        if let [Some(_), Some(_)] = [lhunks.peek(), rhunks.peek()] {
             Ok(InfoChain {
                 lchain: Chain::<'a, 'L'>::new(lhunks),
                 rchain: Chain::<'a, 'R'>::new(rhunks),

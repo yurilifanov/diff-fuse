@@ -1,5 +1,4 @@
 use crate::fuse::info::Info;
-use crate::fuse::info_chain::InfoChain;
 use crate::fuse::info_source::InfoSource;
 use crate::fuse::line_counter::LineCounter;
 
@@ -11,7 +10,7 @@ use core::cmp::Ordering;
 
 pub fn fuse<T: InfoSource>(
     mut header: Header,
-    mut source: T,
+    source: T,
 ) -> Result<Hunk, MergeError> {
     let mut counter = LineCounter::default();
     let mut data: Vec<((i64, i64), Info)> = Vec::new();
@@ -101,10 +100,6 @@ impl<T: InfoSource> Drain<T> {
                 )))
             }
         }
-    }
-
-    fn peek(&mut self) -> [Option<&Info>; 2] {
-        self.source.peek()
     }
 
     fn take_left(&mut self) -> DrainItem {

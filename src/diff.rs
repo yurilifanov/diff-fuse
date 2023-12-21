@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fs;
-// use std::iter::zip;
 use std::path::PathBuf;
 use std::slice::Iter;
 use std::str::FromStr;

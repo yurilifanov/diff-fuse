@@ -1,5 +1,4 @@
 use crate::error::{MergeError, ParseError};
-use crate::line_no::LineNo;
 use crate::macros::{merge_err, parse_err};
 use core::cmp::{min, Ordering};
 
@@ -116,7 +115,7 @@ impl Header {
     }
 
     pub fn to_string(&self) -> String {
-        let [mut mmin, mnum, mut pmin, pnum] = self.fields;
+        let [mmin, mnum, pmin, pnum] = self.fields;
         match [mnum, pnum] {
             [1, 1] => format!("@@ -{mmin} +{pmin} @@"),
             [_, 1] => format!("@@ -{mmin},{mnum} +{pmin} @@"),

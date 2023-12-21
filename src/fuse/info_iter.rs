@@ -1,22 +1,12 @@
 use crate::fuse::info::Info;
-use crate::line_no::LineNo;
-
-use crate::hunk::{Header, Hunk};
+use crate::hunk::Header;
 
 type LineIter = std::vec::IntoIter<String>;
 
 pub struct InfoIter {
     lines: LineIter,
-    line_no: LineNo,
     rank: i64,
     kind: char,
-}
-
-fn init_line_no(header: &Header) -> LineNo {
-    let mut line_no: LineNo = (&header.fields).into();
-    line_no.nums[0] -= 1;
-    line_no.nums[1] -= 1;
-    line_no
 }
 
 impl InfoIter {
@@ -24,7 +14,6 @@ impl InfoIter {
         let kind = '+';
         InfoIter {
             lines,
-            line_no: init_line_no(header),
             rank: header.fields[2],
             kind,
         }
@@ -34,7 +23,6 @@ impl InfoIter {
         let kind = '-';
         InfoIter {
             lines,
-            line_no: init_line_no(header),
             rank: header.fields[0],
             kind,
         }
@@ -46,9 +34,7 @@ impl Iterator for InfoIter {
 
     fn next(&mut self) -> Option<Info> {
         let line = self.lines.next()?;
-        self.line_no.bump(line.chars().nth(0).unwrap_or('!'));
-        let info: Info =
-            (line, self.line_no.clone(), self.rank.clone()).into();
+        let info: Info = (line, self.rank.clone()).into();
         if info.line.starts_with([self.kind, ' ']) {
             self.rank += 1;
         }
@@ -60,7 +46,6 @@ impl Default for InfoIter {
     fn default() -> InfoIter {
         InfoIter {
             lines: LineIter::default(),
-            line_no: LineNo::default(),
             rank: 0,
             kind: '!',
         }
@@ -71,7 +56,6 @@ impl Default for InfoIter {
 mod tests {
     use crate::fuse::info::Info;
     use crate::fuse::info_iter::{InfoIter, LineIter};
-    use crate::line_no::LineNo;
 
     fn split(line: &str) -> LineIter {
         line.char_indices()
@@ -81,7 +65,7 @@ mod tests {
             .into_iter()
     }
 
-    fn test(actual: InfoIter, expected: Vec<(&str, [i64; 2], i64)>) {
+    fn test(actual: InfoIter, expected: Vec<(&str, i64)>) {
         for (act, exp) in actual.zip(expected.into_iter()) {
             assert_eq!(act, Info::from(exp));
         }
@@ -90,7 +74,7 @@ mod tests {
     fn test_left(
         header: [i64; 4],
         lines: LineIter,
-        expected: Vec<(&str, [i64; 2], i64)>,
+        expected: Vec<(&str, i64)>,
     ) {
         test(InfoIter::left(lines, &header.into()), expected);
     }
@@ -98,7 +82,7 @@ mod tests {
     fn test_right(
         header: [i64; 4],
         lines: LineIter,
-        expected: Vec<(&str, [i64; 2], i64)>,
+        expected: Vec<(&str, i64)>,
     ) {
         test(InfoIter::right(lines, &header.into()), expected);
     }
@@ -109,15 +93,15 @@ mod tests {
             [1, 0, 1, 0],
             split("+ -+ +- -"),
             vec![
-                ("+", [0, 1], 1),
-                (" ", [1, 2], 2),
-                ("-", [2, 2], 3),
-                ("+", [2, 3], 3),
-                (" ", [3, 4], 4),
-                ("+", [3, 5], 5),
-                ("-", [4, 5], 6),
-                (" ", [5, 6], 6),
-                ("-", [6, 6], 7),
+                ("+", 1),
+                (" ", 2),
+                ("-", 3),
+                ("+", 3),
+                (" ", 4),
+                ("+", 5),
+                ("-", 6),
+                (" ", 6),
+                ("-", 7),
             ],
         );
     }
@@ -127,13 +111,7 @@ mod tests {
         test_right(
             [3, 0, 3, 0],
             split("+++- "),
-            vec![
-                ("+", [2, 3], 3),
-                ("+", [2, 4], 3),
-                ("+", [2, 5], 3),
-                ("-", [3, 5], 3),
-                (" ", [4, 6], 4),
-            ],
+            vec![("+", 3), ("+", 3), ("+", 3), ("-", 3), (" ", 4)],
         );
     }
 }
