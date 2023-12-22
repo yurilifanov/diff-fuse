@@ -1,4 +1,4 @@
-pub mod header;
+mod header;
 mod info_source;
 
 pub use header::Header;

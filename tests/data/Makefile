@@ -4,6 +4,7 @@ all: build svn
 
 # For when "Error: failed to connect: dial tcp 127.0.0.1:XXXXX: ..."
 podman-reset-vm:
+	podman machine stop
 	podman machine rm podman-machine-default
 	podman machine init
 	podman machine start
