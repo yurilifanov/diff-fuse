@@ -1,4 +1,4 @@
-use crate::fuse::info::Info;
+use crate::fuse::line::Line;
 use crate::hunk::Header;
 
 type LineIter = std::vec::IntoIter<String>;
@@ -30,11 +30,11 @@ impl InfoIter {
 }
 
 impl Iterator for InfoIter {
-    type Item = Info;
+    type Item = Line;
 
-    fn next(&mut self) -> Option<Info> {
+    fn next(&mut self) -> Option<Line> {
         let line = self.lines.next()?;
-        let info: Info = (line, self.rank.clone()).into();
+        let info: Line = (line, self.rank.clone()).into();
         if info.line.starts_with([self.kind, ' ']) {
             self.rank += 1;
         }
@@ -54,7 +54,7 @@ impl Default for InfoIter {
 
 #[cfg(test)]
 mod tests {
-    use crate::fuse::info::Info;
+    use crate::fuse::line::Line;
     use crate::fuse::info_iter::{InfoIter, LineIter};
 
     fn split(line: &str) -> LineIter {
@@ -67,7 +67,7 @@ mod tests {
 
     fn test(actual: InfoIter, expected: Vec<(&str, i64)>) {
         for (act, exp) in actual.zip(expected.into_iter()) {
-            assert_eq!(act, Info::from(exp));
+            assert_eq!(act, Line::from(exp));
         }
     }
 

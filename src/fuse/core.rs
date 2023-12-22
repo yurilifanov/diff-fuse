@@ -1,4 +1,4 @@
-use crate::fuse::info::Info;
+use crate::fuse::line::Line;
 use crate::fuse::info_source::InfoSource;
 use crate::fuse::line_counter::LineCounter;
 
@@ -13,7 +13,7 @@ pub fn fuse<T: InfoSource>(
     source: T,
 ) -> Result<Hunk, MergeError> {
     let mut counter = LineCounter::default();
-    let mut data: Vec<((i64, i64), Info)> = Vec::new();
+    let mut data: Vec<((i64, i64), Line)> = Vec::new();
     let mut drain = Drain::<T> { source };
 
     while let Some(item) = drain.next() {
@@ -40,8 +40,8 @@ pub fn fuse<T: InfoSource>(
 // TODO: these should be arrays - [Info; 0], [Info; 1] ...
 enum FuseItem {
     None,
-    Single(Info),
-    Pair((Info, Info)),
+    Single(Line),
+    Pair((Line, Line)),
 }
 
 type DrainItem = Option<Result<FuseItem, MergeError>>;
@@ -150,14 +150,14 @@ impl<T: InfoSource> Drain<T> {
         }
     }
 
-    fn take(info: Option<Info>) -> DrainItem {
+    fn take(info: Option<Line>) -> DrainItem {
         Some(Ok(FuseItem::Single(info?)))
     }
 }
 
 fn sort(
-    mut data: Vec<((i64, i64), Info)>,
-) -> Result<Vec<((i64, i64), Info)>, MergeError> {
+    mut data: Vec<((i64, i64), Line)>,
+) -> Result<Vec<((i64, i64), Line)>, MergeError> {
     let mut err: Option<MergeError> = None;
     let mut update_err = |e: MergeError| {
         if err.is_none() {

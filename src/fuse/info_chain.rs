@@ -1,4 +1,4 @@
-use crate::fuse::info::Info;
+use crate::fuse::line::Line;
 use crate::fuse::info_iter::InfoIter;
 use crate::fuse::info_source::InfoSource;
 
@@ -44,7 +44,7 @@ impl<'a, const T: char> Chain<'_, T> {
         }
     }
 
-    pub fn peek(&mut self, header: &Header) -> Option<&Info> {
+    pub fn peek(&mut self, header: &Header) -> Option<&Line> {
         loop {
             if self.info_iter.peek().is_some() {
                 return self.info_iter.peek();
@@ -78,7 +78,7 @@ impl<'a, const T: char> Chain<'_, T> {
         }
     }
 
-    pub fn next(&mut self, header: &Header) -> Option<Info> {
+    pub fn next(&mut self, header: &Header) -> Option<Line> {
         if self.peek(header).is_some() {
             self.info_iter.next()
         } else {
@@ -111,17 +111,17 @@ impl<'a> InfoChain<'_> {
 }
 
 impl<'a> InfoSource for InfoChain<'_> {
-    fn peek(&mut self) -> [Option<&Info>; 2] {
+    fn peek(&mut self) -> [Option<&Line>; 2] {
         let lhdr = self.lchain.header();
         let rhdr = self.rchain.header();
         [self.lchain.peek(&rhdr), self.rchain.peek(&lhdr)]
     }
 
-    fn next_left(&mut self) -> Option<Info> {
+    fn next_left(&mut self) -> Option<Line> {
         self.lchain.next(&self.rchain.header())
     }
 
-    fn next_right(&mut self) -> Option<Info> {
+    fn next_right(&mut self) -> Option<Line> {
         self.rchain.next(&self.lchain.header())
     }
 }

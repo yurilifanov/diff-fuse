@@ -1,4 +1,4 @@
-use crate::fuse::info::Info;
+use crate::fuse::line::Line;
 use crate::fuse::info_iter::InfoIter;
 use crate::fuse::info_source::InfoSource as Trait;
 
@@ -23,15 +23,15 @@ impl InfoSource {
 }
 
 impl Trait for InfoSource {
-    fn peek(&mut self) -> [Option<&Info>; 2] {
+    fn peek(&mut self) -> [Option<&Line>; 2] {
         [self.left.peek(), self.right.peek()]
     }
 
-    fn next_right(&mut self) -> Option<Info> {
+    fn next_right(&mut self) -> Option<Line> {
         self.right.next()
     }
 
-    fn next_left(&mut self) -> Option<Info> {
+    fn next_left(&mut self) -> Option<Line> {
         self.left.next()
     }
 }

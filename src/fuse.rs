@@ -1,9 +1,9 @@
 pub mod core;
 pub mod fuse_iter;
-pub mod info;
 mod info_chain;
 pub mod info_iter;
 pub mod info_source;
+pub mod line;
 mod line_counter;
 
 #[cfg(test)]
