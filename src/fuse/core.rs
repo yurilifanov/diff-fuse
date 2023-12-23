@@ -1,5 +1,5 @@
-use crate::fuse::line::Line;
 use crate::fuse::info_source::InfoSource;
+use crate::fuse::line::Line;
 use crate::fuse::line_counter::LineCounter;
 
 use crate::error::MergeError;
@@ -21,7 +21,7 @@ pub fn fuse<T: InfoSource>(
             FuseItem::Single(info) => {
                 data.push((counter.update(&info)?, info));
             }
-            FuseItem::Pair((linfo, rinfo)) => {
+            FuseItem::Pair(linfo, rinfo) => {
                 data.push((counter.update(&linfo)?, linfo));
                 data.push((counter.update(&rinfo)?, rinfo));
             }
@@ -37,11 +37,10 @@ pub fn fuse<T: InfoSource>(
     ))
 }
 
-// TODO: these should be arrays - [Info; 0], [Info; 1] ...
 enum FuseItem {
     None,
     Single(Line),
-    Pair((Line, Line)),
+    Pair(Line, Line),
 }
 
 type DrainItem = Option<Result<FuseItem, MergeError>>;
@@ -82,7 +81,7 @@ impl<T: InfoSource> Drain<T> {
                     right.line.replace_range(0..1, " ");
                     Some(Ok(FuseItem::Single(right)))
                 } else {
-                    Some(Ok(FuseItem::Pair((left, right))))
+                    Some(Ok(FuseItem::Pair(left, right)))
                 }
             }
 
