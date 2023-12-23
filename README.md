@@ -21,5 +21,5 @@ diff-fuse 1234.diff 1240.diff ... > all.diff
 ## Disclaimer
 
 This is a toy project. If you actually need this functionality, you're much
-better off with [this](#diff-fuse.sh) script.
+better off with [this](diff-fuse.sh) script.
 
