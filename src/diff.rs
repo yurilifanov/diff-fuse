@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::slice::Iter;
 use std::str::FromStr;
 
-use crate::error::{MergeError, ParseError};
+use crate::error::{MergeErr, ParseErr};
 use crate::file_diff;
 use crate::file_diff::FileDiff;
 use crate::macros::{debugln, parse_err};
@@ -42,7 +42,7 @@ impl<'a> Iterator for LineIter<'a> {
 }
 
 impl Diff {
-    pub fn read(path: &PathBuf) -> Result<Diff, ParseError> {
+    pub fn read(path: &PathBuf) -> Result<Diff, ParseErr> {
         debugln!("Reading {}", path.display());
         let data = fs::read_to_string(path)?;
         Ok(Self::from(data.parse()?))
@@ -50,7 +50,7 @@ impl Diff {
 
     pub fn from_lines<'a, T: Iterator<Item = &'a str>>(
         lines: &mut T,
-    ) -> Result<Diff, ParseError> {
+    ) -> Result<Diff, ParseErr> {
         let mut peekable = lines.peekable();
         let mut _order: Vec<String> = Vec::new();
         let mut _map: HashMap<String, FileDiff> = HashMap::new();
@@ -81,7 +81,7 @@ impl Diff {
         }
     }
 
-    pub fn fuse(mut self, mut other: Diff) -> Result<Diff, MergeError> {
+    pub fn fuse(mut self, mut other: Diff) -> Result<Diff, MergeErr> {
         let mut _order: Vec<String> = Vec::new();
         let mut _map: HashMap<String, FileDiff> = HashMap::new();
         for (key, val) in other._map.drain() {
@@ -102,7 +102,7 @@ impl Diff {
 }
 
 impl FromStr for Diff {
-    type Err = ParseError;
+    type Err = ParseErr;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Diff::from_lines(&mut s.lines())
     }

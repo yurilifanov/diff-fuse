@@ -1,4 +1,4 @@
-use crate::error::{MergeError, ParseError};
+use crate::error::{MergeErr, ParseErr};
 use crate::macros::{merge_err, parse_err};
 use core::cmp::{min, Ordering};
 
@@ -30,7 +30,7 @@ impl std::fmt::Display for Header {
 }
 
 impl Header {
-    pub fn parse(header: &str) -> Result<Header, ParseError> {
+    pub fn parse(header: &str) -> Result<Header, ParseErr> {
         let group_iter = header
             .strip_prefix("@@ ")
             .map_or(None, |s| s.strip_suffix(" @@")) // keep the last ' '
@@ -128,7 +128,7 @@ impl Header {
         mut self,
         left: i64,
         right: i64,
-    ) -> Result<Header, MergeError> {
+    ) -> Result<Header, MergeErr> {
         self.fields[0] += left;
         self.fields[2] += right;
         if self.fields[0] < 0 || self.fields[2] < 0 {

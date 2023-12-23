@@ -1,4 +1,4 @@
-use crate::error::{MergeError, ParseError};
+use crate::error::{MergeErr, ParseErr};
 use crate::fuse::fuse_iter::fuse_iter;
 use crate::header::Header;
 use crate::hunk::Hunk;
@@ -45,7 +45,7 @@ impl<'a> Iterator for LineIter<'a> {
 impl FileDiff {
     pub fn from_lines<'a, T: Iterator<Item = &'a str>>(
         mut lines: &mut Peekable<T>,
-    ) -> Result<FileDiff, ParseError> {
+    ) -> Result<FileDiff, ParseErr> {
         let _header = Header::from_lines(lines)?;
         let mut _num_lines = _header.lines().len();
         let mut _hunks: Vec<Hunk> = Vec::new();
@@ -97,7 +97,7 @@ impl FileDiff {
         }
     }
 
-    pub fn fuse(self, other: FileDiff) -> Result<FileDiff, MergeError> {
+    pub fn fuse(self, other: FileDiff) -> Result<FileDiff, MergeErr> {
         let mut hunks: Vec<Hunk> = Vec::new();
         let mut _num_lines = self._header.lines().len();
 

@@ -3,7 +3,7 @@ mod info_source;
 
 pub use header::Header;
 
-use crate::error::{MergeError, ParseError};
+use crate::error::{MergeErr, ParseErr};
 use crate::fuse::core::fuse;
 use crate::macros::{merge_err, parse_err};
 
@@ -28,7 +28,7 @@ impl Hunk {
 
     pub fn from_lines<'a, T: Iterator<Item = &'a str>>(
         lines: &mut Peekable<T>,
-    ) -> Result<Hunk, ParseError> {
+    ) -> Result<Hunk, ParseErr> {
         if let Some(line) = lines.peek() {
             if !line.starts_with("@@") {
                 return Err(parse_err!("Expected hunk header, got '{line}'"));
@@ -91,11 +91,7 @@ impl Hunk {
         self._header.overlaps(&other._header)
     }
 
-    pub fn with_offset(
-        self,
-        left: i64,
-        right: i64,
-    ) -> Result<Hunk, MergeError> {
+    pub fn with_offset(self, left: i64, right: i64) -> Result<Hunk, MergeErr> {
         let _header = self._header.with_offset(left, right)?;
         let mut _lines = self._lines;
         _lines[0] = _header.to_string();
@@ -116,7 +112,7 @@ impl Hunk {
         num_added - num_removed
     }
 
-    pub fn fuse(self, other: Hunk) -> Result<Hunk, MergeError> {
+    pub fn fuse(self, other: Hunk) -> Result<Hunk, MergeErr> {
         if !self.header().should_fuse(other.header()) {
             return Err(merge_err!(
                 "Expected hunks {} and {} to overlap, but they do not",

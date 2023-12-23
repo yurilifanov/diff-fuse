@@ -1,4 +1,4 @@
-use crate::error::MergeError;
+use crate::error::MergeErr;
 use crate::fuse::line::Line;
 use crate::hunk::Header;
 use crate::macros::merge_err;
@@ -24,7 +24,7 @@ impl Default for LineCounter {
 }
 
 impl LineCounter {
-    pub fn update(&mut self, info: &Line) -> Result<(i64, i64), MergeError> {
+    pub fn update(&mut self, info: &Line) -> Result<(i64, i64), MergeErr> {
         match info.prefix() {
             '-' => {
                 self.num_removed += 1;

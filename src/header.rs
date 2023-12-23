@@ -1,4 +1,4 @@
-use crate::error::ParseError;
+use crate::error::ParseErr;
 use crate::macros::parse_err;
 
 #[derive(Debug, Clone)]
@@ -9,14 +9,14 @@ pub struct Header {
 
 fn get_line<'a, T: Iterator<Item = &'a str>>(
     lines: &mut T,
-) -> Result<String, ParseError> {
+) -> Result<String, ParseErr> {
     lines
         .next()
         .map(|s| s.to_string())
         .ok_or(parse_err!("Header: Could not get line"))
 }
 
-fn get_file_name(line: &String) -> Result<String, ParseError> {
+fn get_file_name(line: &String) -> Result<String, ParseErr> {
     line.strip_prefix("Index: ")
         .map(|s| s.to_string())
         .ok_or(parse_err!("Header: Unexpected suffix in '{line}'"))
@@ -25,7 +25,7 @@ fn get_file_name(line: &String) -> Result<String, ParseError> {
 impl Header {
     pub fn from_lines<'a, T: Iterator<Item = &'a str>>(
         lines: &mut T,
-    ) -> Result<Header, ParseError> {
+    ) -> Result<Header, ParseErr> {
         let _lines: Vec<_> = vec![
             get_line(lines)?,
             get_line(lines)?,

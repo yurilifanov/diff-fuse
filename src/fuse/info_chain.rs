@@ -1,8 +1,8 @@
-use crate::fuse::line::Line;
 use crate::fuse::info_iter::InfoIter;
 use crate::fuse::info_source::InfoSource;
+use crate::fuse::line::Line;
 
-use crate::error::MergeError;
+use crate::error::MergeErr;
 use crate::hunk::{Header, Hunk};
 use crate::macros::{debugln, merge_err};
 use std::iter::Peekable;
@@ -96,7 +96,7 @@ impl<'a> InfoChain<'_> {
     pub fn new(
         lhunks: &'a mut Peekable<HunkIter>,
         rhunks: &'a mut Peekable<HunkIter>,
-    ) -> Result<InfoChain<'a>, MergeError> {
+    ) -> Result<InfoChain<'a>, MergeErr> {
         if let [Some(_), Some(_)] = [lhunks.peek(), rhunks.peek()] {
             Ok(InfoChain {
                 lchain: Chain::<'a, 'L'>::new(lhunks),

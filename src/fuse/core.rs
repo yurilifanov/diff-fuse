@@ -2,7 +2,7 @@ use crate::fuse::info_source::InfoSource;
 use crate::fuse::line::Line;
 use crate::fuse::line_counter::LineCounter;
 
-use crate::error::MergeError;
+use crate::error::MergeErr;
 use crate::hunk::{Header, Hunk};
 use crate::macros::merge_err;
 
@@ -11,7 +11,7 @@ use core::cmp::Ordering;
 pub fn fuse<T: InfoSource>(
     mut header: Header,
     source: T,
-) -> Result<Hunk, MergeError> {
+) -> Result<Hunk, MergeErr> {
     let mut counter = LineCounter::default();
     let mut data: Vec<((i64, i64), Line)> = Vec::new();
     let mut drain = Drain::<T> { source };
@@ -43,7 +43,7 @@ enum FuseItem {
     Pair(Line, Line),
 }
 
-type DrainItem = Option<Result<FuseItem, MergeError>>;
+type DrainItem = Option<Result<FuseItem, MergeErr>>;
 
 struct Drain<T: InfoSource> {
     source: T,
@@ -156,9 +156,9 @@ impl<T: InfoSource> Drain<T> {
 
 fn sort(
     mut data: Vec<((i64, i64), Line)>,
-) -> Result<Vec<((i64, i64), Line)>, MergeError> {
-    let mut err: Option<MergeError> = None;
-    let mut update_err = |e: MergeError| {
+) -> Result<Vec<((i64, i64), Line)>, MergeErr> {
+    let mut err: Option<MergeErr> = None;
+    let mut update_err = |e: MergeErr| {
         if err.is_none() {
             err = Some(e);
         }

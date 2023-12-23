@@ -1,7 +1,7 @@
 use crate::fuse::core::fuse;
 use crate::fuse::info_chain::{HunkIter, InfoChain};
 
-use crate::error::MergeError;
+use crate::error::MergeErr;
 use crate::hunk::Hunk;
 use crate::macros::{debugln, merge_err};
 
@@ -11,7 +11,7 @@ use std::iter::Peekable;
 pub fn fuse_iter(
     lhunks: Vec<Hunk>,
     rhunks: Vec<Hunk>,
-) -> impl Iterator<Item = Result<Hunk, MergeError>> {
+) -> impl Iterator<Item = Result<Hunk, MergeErr>> {
     // A file diff is an ordered set X[i], i >= 0 of non-overlapping hunks.
     // Consider two file diffs, X and Y.
     //
@@ -37,7 +37,7 @@ pub fn fuse_iter(
     let mut riter = rhunks.into_iter().peekable();
     let mut loffset = 0i64;
     let mut roffset = 0i64;
-    std::iter::from_fn(move || -> Option<Result<Hunk, MergeError>> {
+    std::iter::from_fn(move || -> Option<Result<Hunk, MergeErr>> {
         match [liter.peek(), riter.peek()] {
             [None, None] => None,
             [None, Some(rhs)] => {
@@ -95,7 +95,7 @@ pub fn fuse_iter(
 fn fuse_overlapping(
     lhunks: &mut Peekable<HunkIter>,
     rhunks: &mut Peekable<HunkIter>,
-) -> Result<Hunk, MergeError> {
+) -> Result<Hunk, MergeErr> {
     let header = if let (Some(l), Some(r)) = (lhunks.peek(), rhunks.peek()) {
         l.header().fuse(r.header())
     } else {

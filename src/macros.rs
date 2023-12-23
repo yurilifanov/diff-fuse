@@ -41,13 +41,13 @@ macro_rules! warnln {
 
 macro_rules! parse_err {
     ($($args:expr),*) => (
-        ParseError::from(format!($($args),*))
+        ParseErr::from(format!($($args),*))
     )
 }
 
 macro_rules! merge_err {
     ($($args:expr),*) => (
-        MergeError::from(format!($($args),*))
+        MergeErr::from(format!($($args),*))
     )
 }
 
