@@ -1,11 +1,13 @@
-use std::slice::Iter;
-
-use crate::error::ParseError;
+use crate::error::{MergeErr, ParseErr};
+use crate::fuse::fuse_iter::fuse_iter;
 use crate::header::Header;
 use crate::hunk::Hunk;
-use crate::macros::debugln;
+use crate::macros::{debugln, parse_err, warnln};
+use std::slice::Iter;
 
-#[derive(Debug)]
+use std::iter::Peekable;
+
+#[derive(Debug, Clone)]
 pub struct FileDiff {
     _header: Header,
     _hunks: Vec<Hunk>,
@@ -41,25 +43,35 @@ impl<'a> Iterator for LineIter<'a> {
 }
 
 impl FileDiff {
-    pub fn parse(lines: &[&str]) -> Result<FileDiff, ParseError> {
-        let _header = Header::parse(lines)?;
+    pub fn from_lines<'a, T: Iterator<Item = &'a str>>(
+        mut lines: &mut Peekable<T>,
+    ) -> Result<FileDiff, ParseErr> {
+        let _header = Header::from_lines(lines)?;
         let mut _num_lines = _header.lines().len();
-        let mut view = &lines[_num_lines..];
         let mut _hunks: Vec<Hunk> = Vec::new();
-
-        loop {
-            let hunk = Hunk::parse(view)?;
-            debugln!("Got hunk {:?}", hunk);
-
-            let hunk_lines = hunk.lines().len();
-            _num_lines += hunk_lines;
-
-            view = &view[hunk_lines..];
-            _hunks.push(hunk);
-
-            let predicate = |s: &&str| s.starts_with("Index: ");
-            if view.get(0).map_or(true, predicate) {
+        while let Some(line) = lines.peek() {
+            if line.chars().all(char::is_whitespace) {
+                lines.next();
+                continue;
+            } else if !line.starts_with("@@") {
                 break;
+            }
+            let hunk = Hunk::from_lines(&mut lines)?;
+            debugln!("Parsed hunk {hunk}");
+            _num_lines += hunk.lines().len();
+            _hunks.push(hunk);
+        }
+
+        for (i, lhs) in _hunks.iter().enumerate() {
+            for rhs in _hunks.iter().skip(i + 1) {
+                if lhs.overlaps(rhs) {
+                    return Err(parse_err!(
+                        "Could not parse file {}: hunks {} and {} overlap",
+                        _header.file_name(),
+                        lhs,
+                        rhs
+                    ));
+                }
             }
         }
 
@@ -83,5 +95,325 @@ impl FileDiff {
             _hunk_iter: self._hunks.iter(),
             _line_iter: self._header.lines().iter(),
         }
+    }
+
+    pub fn fuse(self, other: FileDiff) -> Result<FileDiff, MergeErr> {
+        let mut hunks: Vec<Hunk> = Vec::new();
+        let mut _num_lines = self._header.lines().len();
+
+        for item in fuse_iter(self._hunks, other._hunks) {
+            let hunk = item?;
+
+            if hunk.header().is_empty() {
+                if hunk.lines().len() != 0 {
+                    warnln!("FileDiff::fuse -- Empty hunk with lines");
+                }
+                continue;
+            }
+
+            _num_lines += hunk.lines().len();
+            hunks.push(hunk);
+        }
+
+        Ok(FileDiff {
+            _header: self._header.clone(),
+            _hunks: hunks,
+            _num_lines,
+        })
+    }
+}
+
+impl ToString for FileDiff {
+    fn to_string(&self) -> String {
+        let mut string = String::new();
+        for line in self.line_iter() {
+            string += line;
+            string += "\n";
+        }
+        string
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::file_diff::FileDiff;
+
+    fn test(lhs: &str, rhs: &str, expected: &str) {
+        let ldiff = match FileDiff::from_lines(&mut lhs.lines().peekable()) {
+            Ok(diff) => diff,
+            Err(err) => {
+                panic!("{err:?}");
+            }
+        };
+
+        let rdiff = match FileDiff::from_lines(&mut rhs.lines().peekable()) {
+            Ok(diff) => diff,
+            Err(err) => {
+                panic!("{err:?}");
+            }
+        };
+
+        let fused = match ldiff.fuse(rdiff) {
+            Ok(diff) => diff,
+            Err(err) => {
+                panic!("{err:?}");
+            }
+        };
+
+        assert_eq!(fused.to_string().as_str(), expected);
+    }
+
+    #[test]
+    fn case_1() {
+        test(
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1 +1 @@
+-a
++b
+",
+            "\
+    Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1 +1 @@
+-b
++c
+",
+            "\
+    Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1 +1 @@
+-a
++c
+",
+        );
+    }
+
+    #[test]
+    fn case_2() {
+        test(
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1 +1 @@
+-a
++1
+@@ -2 +2 @@
+-b
++2
+@@ -3 +3 @@
+-c
++3
+",
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1,3 +1,3 @@
+-1
+-2
+-3
++i
++ii
++iii
+",
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1,3 +1,3 @@
+-a
+-b
+-c
++i
++ii
++iii
+",
+        );
+    }
+
+    #[test]
+    fn case_3() {
+        test(
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1,3 +1,3 @@
+-1
+-2
+-3
++i
++ii
++iii
+",
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1 +1 @@
+-i
++a
+@@ -2 +2 @@
+-ii
++b
+@@ -3 +3 @@
+-iii
++c
+",
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1,3 +1,3 @@
+-1
+-2
+-3
++a
++b
++c
+",
+        );
+    }
+
+    #[test]
+    fn case_4() {
+        test(
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1 +1 @@
+-1
++i
+@@ -2,2 +2,2 @@
+-2
+-3
++ii
++iii
+",
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1,2 +1,2 @@
+-i
+-ii
++a
++b
+@@ -3 +3 @@
+-iii
++c
+",
+            "\
+Index: test.txt
+===================================================================
+--- test.txt
++++ test.txt
+@@ -1,3 +1,3 @@
+-1
+-2
+-3
++a
++b
++c
+",
+        );
+    }
+
+    #[test]
+    fn case_5() {
+        test(
+            "\
+Index: text.txt
+===================================================================
+--- text.txt
++++ text.txt
+@@ -6 +6 @@
+-5
++e
+",
+            "\
+Index: text.txt
+===================================================================
+--- text.txt
++++ text.txt
+@@ -1 +0,0 @@
+-0
+@@ -9 +8 @@
+-8
++viii
+",
+            "\
+Index: text.txt
+===================================================================
+--- text.txt
++++ text.txt
+@@ -1 +0,0 @@
+-0
+@@ -6 +5 @@
+-5
++e
+@@ -9 +8 @@
+-8
++viii
+",
+        );
+    }
+
+    #[test]
+    fn case_6() {
+        test(
+            "\
+Index: text.txt
+===================================================================
+--- text.txt
++++ text.txt
+@@ -1,3 +1,0 @@
+-1
+-2
+-3
+@@ -9 +6,2 @@
+ 9
++x
+",
+            "\
+Index: text.txt
+===================================================================
+--- text.txt
++++ text.txt
+@@ -6 +5,0 @@
+-9
+",
+            "\
+Index: text.txt
+===================================================================
+--- text.txt
++++ text.txt
+@@ -1,3 +1,0 @@
+-1
+-2
+-3
+@@ -9 +6 @@
+-9
++x
+",
+        );
     }
 }

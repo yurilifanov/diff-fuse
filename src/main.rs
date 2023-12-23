@@ -1,15 +1,5 @@
-mod diff;
-mod error;
-mod file_diff;
-mod header;
-mod hunk;
-mod input;
-mod macros;
-
-use std::fs;
-
-use diff::Diff;
-use macros::debugln;
+use diff_fuse::diff::Diff;
+use diff_fuse::input;
 
 fn main() {
     if input::has_help_arg() {
@@ -18,23 +8,19 @@ fn main() {
     }
 
     let paths = input::get_paths();
-    for path in paths.as_slice() {
-        assert!(path.is_file());
+    if paths.len() < 1 {
+        println!("Expected at least one path");
+        return;
     }
 
-    let path = paths.get(0).unwrap();
-    debugln!("{}", path.display());
-
-    let data = fs::read_to_string(path).unwrap();
-    debugln!("{}", data);
-
-    // let lines = get_lines(&data);
-    // debugln!("{} lines read", lines.len());
-
-    let diff = Diff::from(data.parse().unwrap());
-    debugln!("{:?}", diff);
+    let mut path_iter = paths.into_iter();
+    let first_path = path_iter.next().unwrap();
+    let diff = path_iter
+        .fold(Diff::read(&first_path).unwrap(), |diff, path| {
+            diff.fuse(Diff::read(&path).unwrap()).unwrap()
+        });
 
     for line in diff.line_iter() {
-        println!("{}", line);
+        println!("{line}");
     }
 }

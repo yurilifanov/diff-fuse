@@ -1,39 +1,42 @@
-use crate::error::ParseError;
+use crate::error::ParseErr;
 use crate::macros::parse_err;
 
-const HEADER_SIZE: usize = 4;
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Header {
     _lines: Vec<String>,
     _file_name: String,
 }
 
+fn get_line<'a, T: Iterator<Item = &'a str>>(
+    lines: &mut T,
+) -> Result<String, ParseErr> {
+    lines
+        .next()
+        .map(|s| s.to_string())
+        .ok_or(parse_err!("Header: Could not get line"))
+}
+
+fn get_file_name(line: &String) -> Result<String, ParseErr> {
+    line.strip_prefix("Index: ")
+        .map(|s| s.to_string())
+        .ok_or(parse_err!("Header: Unexpected suffix in '{line}'"))
+}
+
 impl Header {
-    fn parse_file_name(line: &str) -> Result<&str, ParseError> {
-        let pat = "Index: ";
-        let pos = line.find(pat).ok_or_else(|| {
-            parse_err!("Header: Could not extract file name from line '{}'", line)
-        })?;
-        Ok(&line[pos + pat.len()..])
-    }
+    pub fn from_lines<'a, T: Iterator<Item = &'a str>>(
+        lines: &mut T,
+    ) -> Result<Header, ParseErr> {
+        let _lines: Vec<_> = vec![
+            get_line(lines)?,
+            get_line(lines)?,
+            get_line(lines)?,
+            get_line(lines)?,
+        ];
 
-    pub fn parse(lines: &[&str]) -> Result<Header, ParseError> {
-        let first_line = lines
+        let _file_name = _lines
             .get(0)
-            .ok_or_else(|| parse_err!("Header: Could not fetch first line"))?;
-
-        let _file_name = Header::parse_file_name(first_line.to_owned())?.to_string();
-
-        let _lines: Vec<String> = lines[..HEADER_SIZE].iter().map(|s| s.to_string()).collect();
-
-        if _lines.len() != HEADER_SIZE {
-            return Err(parse_err!(
-                "Header: Expected {} lines, got {}",
-                HEADER_SIZE,
-                _lines.len()
-            ));
-        }
+            .map(get_file_name)
+            .ok_or(parse_err!("Header: Missing first line"))??;
 
         Ok(Header { _lines, _file_name })
     }

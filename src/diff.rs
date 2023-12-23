@@ -1,9 +1,10 @@
 use std::collections::HashMap;
-use std::iter::zip;
+use std::fs;
+use std::path::PathBuf;
 use std::slice::Iter;
 use std::str::FromStr;
 
-use crate::error::ParseError;
+use crate::error::{MergeErr, ParseErr};
 use crate::file_diff;
 use crate::file_diff::FileDiff;
 use crate::macros::{debugln, parse_err};
@@ -41,13 +42,21 @@ impl<'a> Iterator for LineIter<'a> {
 }
 
 impl Diff {
-    pub fn parse(lines: &[&str]) -> Result<Diff, ParseError> {
-        let mut view = &lines[..];
+    pub fn read(path: &PathBuf) -> Result<Diff, ParseErr> {
+        debugln!("Reading {}", path.display());
+        let data = fs::read_to_string(path)?;
+        Ok(Self::from(data.parse()?))
+    }
+
+    pub fn from_lines<'a, T: Iterator<Item = &'a str>>(
+        lines: &mut T,
+    ) -> Result<Diff, ParseErr> {
+        let mut peekable = lines.peekable();
         let mut _order: Vec<String> = Vec::new();
         let mut _map: HashMap<String, FileDiff> = HashMap::new();
 
-        while !view.is_empty() {
-            let file_diff = FileDiff::parse(view)?;
+        while peekable.peek().is_some() {
+            let file_diff = FileDiff::from_lines(&mut peekable)?;
             let file_name = file_diff.header().file_name().to_string();
 
             if _map.contains_key(&file_name) {
@@ -57,7 +66,6 @@ impl Diff {
                 ));
             }
 
-            view = &view[file_diff.num_lines()..];
             _order.push(file_name.clone());
             _map.insert(file_name, file_diff);
         }
@@ -72,34 +80,31 @@ impl Diff {
             _line_iter: file_diff::LineIter::default(),
         }
     }
-}
 
-fn get_line_separator(data: &str) -> &str {
-    if data.find("\r\n").is_none() {
-        debugln!("LF separator detected");
-        return "\n";
-    }
-
-    debugln!("CRLF separator detected");
-    let last = data.len() - 1;
-    let zipped = zip(data[..last].chars(), data[1..].chars());
-    for (prev, curr) in zipped {
-        if curr == '\n' && prev != '\r' {
-            panic!("Inconsistent line separator");
+    pub fn fuse(mut self, mut other: Diff) -> Result<Diff, MergeErr> {
+        let mut _order: Vec<String> = Vec::new();
+        let mut _map: HashMap<String, FileDiff> = HashMap::new();
+        for (key, val) in other._map.drain() {
+            if let Some(diff) = self._map.remove(&key) {
+                _map.insert(key.clone(), diff.fuse(val)?);
+            } else {
+                _map.insert(key.clone(), val);
+            }
+            _order.push(key);
         }
+        for (key, val) in self._map.drain() {
+            _map.insert(key.clone(), val);
+            _order.push(key);
+        }
+        _order.sort();
+        Ok(Diff { _order, _map })
     }
-    "\r\n"
-}
-
-fn get_lines(data: &str) -> Vec<&str> {
-    let sep = get_line_separator(data);
-    data.split_terminator(sep).collect()
 }
 
 impl FromStr for Diff {
-    type Err = ParseError;
+    type Err = ParseErr;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Diff::parse(&get_lines(s)[..])
+        Diff::from_lines(&mut s.lines())
     }
 }
 
